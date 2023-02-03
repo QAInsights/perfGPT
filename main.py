@@ -1,16 +1,46 @@
-# This is a sample Python script.
+from flask import Flask, request, render_template
+import requests
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+app = Flask(__name__)
 
 
-# Press the green button in the gutter to run the script.
+@app.route('/')
+def index():
+    return render_template("index.html")
+
+
+@app.route("/upload", methods=['POST'])
+def askgpt_upload():
+    file = request.files['file']
+
+    url = "https://api.openai.com/v1/files"
+    api_key = ""
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'multipart/form-data'
+    }
+
+    print(file)
+    response = requests.post(url, headers=headers, files={'file': (file.filename, file.stream, file.content_type)})
+
+    return response.json()
+
+    url = f"https://api.openai.com/v1/engines/davinci/jobs"
+
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "model": "davinci",
+        "prompt": f"analyze the contents of file with id {file_id}"
+    }
+    response = requests.post(url, headers=headers, json=data)
+
+    print(response.json())
+    return "Success", 200
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    app.run(debug=True)
