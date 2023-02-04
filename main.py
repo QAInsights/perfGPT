@@ -1,45 +1,44 @@
 from flask import Flask, request, render_template
-import requests
+import openai
 
 app = Flask(__name__)
 
 
 @app.route('/')
 def index():
+    """
+    index
+    :return:    index html
+    """
     return render_template("index.html")
 
 
 @app.route("/upload", methods=['POST'])
 def askgpt_upload():
+    """
+    ask GPT
+    :return:    analyzed response from GPT
+    """
+    openai.api_key = ""
     file = request.files['file']
-
-    url = "https://api.openai.com/v1/files"
-    api_key = ""
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'multipart/form-data'
-    }
-
     print(file)
-    response = requests.post(url, headers=headers, files={'file': (file.filename, file.stream, file.content_type)})
 
-    return response.json()
-
-    url = f"https://api.openai.com/v1/engines/davinci/jobs"
-
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-
-    data = {
-        "model": "davinci",
-        "prompt": f"analyze the contents of file with id {file_id}"
-    }
-    response = requests.post(url, headers=headers, json=data)
-
-    print(response.json())
-    return "Success", 200
+    contents = file.read().decode("utf-8")
+    try:
+        response = openai.Completion.create(
+            model="text-davinci-003",
+            prompt=f"""
+            Please analyse this performance test results {contents}
+            """,
+            temperature=0,
+            max_tokens=100,
+            top_p=1.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
+        )
+        return render_template("analysis_response.html", response=response['choices'][0]['text'])
+    except Exception as e:
+        return e
 
 
 if __name__ == '__main__':

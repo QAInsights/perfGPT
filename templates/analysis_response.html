@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PerfGPT</title>
+</head>
+<body>
+    <h1>Upload your performance test results for AI analysis</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file">
+      <input type="submit" value="Upload">
+    </form>
+    <p>{{ response }}</p>
+</body>
+</html>
