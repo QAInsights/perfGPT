@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template
 import openai
 import os
+import constants
 import pandas as pd
 
 app = Flask(__name__)
@@ -40,6 +41,8 @@ def askgpt_upload():
         if request.files:
             file = request.files['file']
             contents = pd.read_csv(file)
+            if len(contents) > constants.FILE_SIZE:
+                return render_template('analysis_response.html', response="File size too large.")
             try:
                 response = openai.Completion.create(
                     model="text-davinci-003",
