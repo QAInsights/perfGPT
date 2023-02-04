@@ -13,6 +13,16 @@ def index():
     return render_template("index.html")
 
 
+@app.route('/about')
+def about():
+    return render_template("about.html")
+
+
+@app.route('/features')
+def features():
+    return render_template("features.html")
+
+
 @app.route("/upload", methods=['POST'])
 def askgpt_upload():
     """
@@ -28,7 +38,7 @@ def askgpt_upload():
         response = openai.Completion.create(
             model="text-davinci-003",
             prompt=f"""
-            Please analyse this performance test results {contents}
+            Please analyse this performance test results: \n {contents}
             """,
             temperature=0,
             max_tokens=100,
