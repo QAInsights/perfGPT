@@ -2,6 +2,7 @@
 <html>
     <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PerfGPT - Analyze your performance test results using OpenAI</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
@@ -13,14 +14,17 @@
     <div class="container">
         <div class="jumbotron jumbotron-fluid">
             <div class="container">
-                <p class="lead">PerfGPT helps you to analyze your performance test results using OpenAI.</p>
+                <p class="lead">🤖 PerfGPT helps you to analyze your performance test results using OpenAI.</p>
             </div>
         </div>
-        <h4>Your privacy is paramount to us. We DO NOT store or read your file.</h4>
-        <h5>Upload test results:</h5>
+        <h4>🔐 Your privacy is paramount to us. We DO NOT store or read your file.</h4>
+        <br />
+        <h4>⬆️ Upload test results:</h4>
         <form action="/upload" method="post" enctype="multipart/form-data">
-            <input class="form-control" type="file" name="file">
-            <input class="btn btn-primary mb-3" type="submit" value="Upload">
+            <span class="input-group-btn">
+                <input   class="form-control" type="file" name="file">
+                <input   class="btn btn-primary mb-3" type="submit" value="Upload">
+            </span>
         </form>
 
     <h1></h1>

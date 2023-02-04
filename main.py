@@ -2,6 +2,7 @@ from flask import Flask, request, render_template
 import openai
 import os
 import constants
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -39,10 +40,9 @@ def askgpt_upload():
     if request.method == 'POST':
         if request.files:
             file = request.files['file']
-            contents = file.read().decode("utf-8")
+            contents = pd.read_csv(file)
             if len(contents) > constants.FILE_SIZE:
                 return render_template('analysis_response.html', response="File size too large.")
-
             try:
                 response = openai.Completion.create(
                     model="text-davinci-003",
@@ -50,7 +50,7 @@ def askgpt_upload():
                     Please analyse this performance test results: \n {contents}
                     """,
                     temperature=0,
-                    max_tokens=100,
+                    max_tokens=1000,
                     top_p=1.0,
                     frequency_penalty=0.0,
                     presence_penalty=0.0
