@@ -1,5 +1,37 @@
 {% extends 'layout.html' %}
-
+{% block contents %}
+<div class="container">
+    <div class="mt-4 p-5 bg-light rounded">
+        <div class="container">
+            <p class="lead fs-4">🤖 PerfGPT helps you to analyze your performance test results using OpenAI.</p>
+        </div>
+    </div>
+    <h1 class="display-6 fw-bold">Step 1:</h1>
+    <p class="lead">Upload raw data of your performance test using the tool of your choice.</p>
+    <p class="lead">Your privacy is paramount to us. We <strong>DO NOT store or read your file</strong>.</p>
+    <h3 class="display-6 fw-bold" style="font-weight: bold;">Step 2:</h3>
+    <p class="lead">OpenAI will analyze the results and present its findings.</p>
+    <h4>⬆️ Upload test results:</h4>
+    
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <span class="input-group-btn">
+            <div class="row">
+                <div class="col">
+                    <input   class="form-control" type="file" name="file">        
+                </div>
+                <div class="col">
+                    <input   class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
+                </div>
+            </div>
+        </span>
+    </form>
+<h1></h1>
+<div class="row">
+    <div class="spinner-grow mx-auto" id="loading" role="status" style="display: none;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
 {% block body %}
 
 {% endblock %}
