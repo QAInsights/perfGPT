@@ -5,10 +5,10 @@ import re
 import constants
 import pandas as pd
 
-app = Flask(__name__)
+application = Flask(__name__)
 
 
-@app.route('/')
+@application.route('/')
 def index():
     """
     index
@@ -17,7 +17,7 @@ def index():
     return render_template("index.html")
 
 
-@app.route('/about')
+@application.route('/about')
 def about():
     """
 
@@ -26,7 +26,7 @@ def about():
     return render_template("about.html")
 
 
-@app.route('/features')
+@application.route('/features')
 def features():
     """
 
@@ -52,7 +52,7 @@ def beautify_response(text):
     return text
 
 
-@app.route('/upload', methods=['POST'])
+@application.route('/upload', methods=['POST'])
 def askgpt_upload():
     """
     ask GPT
@@ -93,4 +93,4 @@ def askgpt_upload():
 
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    application.run(host='0.0.0.0', port=80, debug=True)
