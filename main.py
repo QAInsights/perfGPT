@@ -12,18 +12,26 @@ app = Flask(__name__)
 def index():
     """
     index
-    :return:    index html
+    :return:    index page
     """
     return render_template("index.html")
 
 
 @app.route('/about')
 def about():
+    """
+
+    :return: about page
+    """
     return render_template("about.html")
 
 
 @app.route('/features')
 def features():
+    """
+
+    :return: features page
+    """
     return render_template("features.html")
 
 
@@ -55,6 +63,9 @@ def askgpt_upload():
     except KeyError:
         return render_template("analysis_response.html", response="API key not set.")
 
+    if request.files['file'].filename == '':
+        return render_template('analysis_response.html', response="Please upload a valid file.")
+
     if request.method == 'POST':
         if request.files:
             file = request.files['file']
@@ -63,15 +74,15 @@ def askgpt_upload():
                 return render_template('analysis_response.html', response="File size too large.")
             try:
                 response = openai.Completion.create(
-                    model="text-davinci-003",
+                    model=constants.model,
                     prompt=f"""
                     Please analyse this performance test results: \n {contents}
                     """,
-                    temperature=0,
-                    max_tokens=1000,
-                    top_p=1.0,
-                    frequency_penalty=0.0,
-                    presence_penalty=0.0
+                    temperature=constants.temperature,
+                    max_tokens=constants.max_tokens,
+                    top_p=constants.top_p,
+                    frequency_penalty=constants.frequency_penalty,
+                    presence_penalty=constants.presence_penalty
                 )
                 response = beautify_response(response['choices'][0]['text'])
                 return render_template("analysis_response.html", response=response)
