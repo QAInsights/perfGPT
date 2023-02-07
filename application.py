@@ -77,7 +77,7 @@ def askgpt_upload():
             except Exception as e:
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure the file is not empty and is in one of the supported formats.")
             
-            if len(contents) > constants.FILE_SIZE:
+            if contents.memory_usage().sum() > constants.FILE_SIZE:
                 return render_template('analysis_response.html', response="File size too large.")
             try:
                 response = openai.Completion.create(
