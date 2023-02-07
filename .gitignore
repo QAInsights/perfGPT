@@ -17,6 +17,10 @@ pyvenv.cfg
 .venv
 pip-selfcheck.json
 
+# Data files
+*.csv
+*.json
+
 # Distribution / packaging
 .Python
 build/
