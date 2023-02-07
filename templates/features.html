@@ -1,14 +1,18 @@
 {% extends 'layout.html' %}
 {% block contents %}
 <div class="container">
-  <h3>✅ Features and Limitations</h3>
+  <h3>✅ Features and Limitations</h3><br/>
   <h4>Upload file format</h4>
   <p class="lead">
-    You can upload raw data in csv format (recommended) using the performance testing tool of your choice.
+    You can upload raw data in CSV format (recommended) or JSON using the performance testing tool of your choice.
   </p>
   <h4>Maximum file size</h4>
   <p class="lead">
-    The maximum file size is 1 GB. Based on the tool usage, we may increase it further.
+    The maximum file size is 100 MiB. Based on the tool usage, we may increase it further.
+  </p>
+  <h4>What tools' results does it parse?</h4>
+  <p class="lead">
+    It is tool agnostic parsing. You can upload the results from any performance testing tool.
   </p>
 </div>
 {% endblock %}

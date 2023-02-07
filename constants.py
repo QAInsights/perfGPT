@@ -1,4 +1,4 @@
-FILE_SIZE = 100_000
+FILE_SIZE = 100_000_000
 model = "text-davinci-003"
 temperature = 0
 max_tokens = 1000
