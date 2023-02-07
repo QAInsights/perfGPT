@@ -75,7 +75,9 @@ def askgpt_upload():
                 if file.filename.endswith('.json'):
                     contents = pd.read_json(file)
             except Exception as e:
-                return render_template('analysis_response.html', response="Cannot read file data. Please make sure the file is not empty and is in one of the supported formats.")
+                return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
+                                                                          "the file is not empty and is in one of the"
+                                                                          " supported formats.")
             
             if contents.memory_usage().sum() > constants.FILE_SIZE:
                 return render_template('analysis_response.html', response="File size too large.")
@@ -94,7 +96,7 @@ def askgpt_upload():
                 response = beautify_response(response['choices'][0]['text'])
                 return render_template("analysis_response.html", response=response)
             except Exception as e:
-                return e
+                return render_template("analysis_response.html", response=e)
         else:
             return render_template('analysis_response.html', response="Upload a valid file")
 
