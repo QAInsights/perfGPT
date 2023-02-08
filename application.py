@@ -1,12 +1,20 @@
-from flask import Flask, request, render_template
-import openai
 import os
 import re
-import constants
+import openai
 import pandas as pd
+from flask import Flask, request, render_template
+from flask import redirect, url_for
+from flask_dance.contrib.github import make_github_blueprint, github
+
+import constants
 
 application = Flask(__name__)
-
+application.secret_key = os.environ['FLASK_SECRET_KEY']
+application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
+application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+github_bp = make_github_blueprint()
+application.register_blueprint(github_bp, url_prefix="/login")
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 @application.route('/')
 def index():
@@ -14,7 +22,22 @@ def index():
     index
     :return:    index page
     """
-    return render_template("index.html")
+    try:
+        resp = github.get("/user")
+        username = resp.json()["login"]
+    except Exception as e:
+        username = ''
+    return render_template("index.html", username=username)
+
+
+@application.route('/signin')
+def github_sign():
+    if not github.authorized:
+        return redirect(url_for("github.login"))
+    resp = github.get("/user")
+    username = resp.json()["login"]
+    print(resp)
+    return render_template("index.html", username=username)
 
 
 @application.route('/about')
@@ -65,6 +88,11 @@ def askgpt_upload():
         "Detailed Summary": "Act like a performance engineer and write a detailed summary from this raw performance "
                             "results."
     }
+    if not github.authorized:
+        return redirect(url_for("github.login"))
+    resp = github.get("/user")
+    username = resp.json()["login"]
+
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
@@ -104,8 +132,7 @@ def askgpt_upload():
                     )
                     response = beautify_response(response['choices'][0]['text'])
                     responses[title] = response
-                print(responses)
-                return render_template("analysis_response.html", response=responses)
+                return render_template("analysis_response.html", response=responses, username=username)
             except Exception as e:
                 return render_template("analysis_response.html", response=e)
         else:
