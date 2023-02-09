@@ -29,6 +29,17 @@ application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
 hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 
 
+def check_authorized_status():
+    if github.authorized:
+        print('User logged in')
+        upload_status = "enable"
+        return {'logged_in': True, 'upload_status': upload_status}
+    else:
+        upload_status = "disable"
+        print('Not logged in')
+        return {'logged_in': False, 'upload_status': upload_status}
+
+
 @application.route('/')
 def index():
     """
@@ -36,12 +47,7 @@ def index():
     :return:    index page
     """
     print(session)
-    if github.authorized:
-        print('User logged in')
-        upload_status = "enable"
-    else:
-        upload_status = "disable"
-        print('Not logged in')
+    check_authorized_status()
 
     try:
         resp = github.get("/user")
@@ -55,15 +61,15 @@ def index():
         )
         print("DB response" + dbresponse)
 
-
     except Exception as e:
         username = ''
 
-    return render_template("index.html", image=hero_image, upload_status=upload_status)
+    return render_template("index.html", image=hero_image, upload_status=check_authorized_status()['upload_status'])
 
 
 @application.route('/signin')
 def github_sign():
+    check_authorized_status()
     if not github.authorized:
         return redirect(url_for("github.login"))
     resp = github.get("/user")
@@ -71,28 +77,30 @@ def github_sign():
     dbresponse = table.put_item(
         Item={
             "username": username,
-            "logged_in": int(time.time() * 1000),
+            "datetime": str(int(time.time() * 1000)),
             "premium_user": False
         }
     )
     print("DB response" + str(dbresponse))
     print(resp)
-    return render_template("index.html", username=username)
+    return render_template("index.html", username=username, upload_status=check_authorized_status()['upload_status'])
+
 
 @application.route('/upload')
 def upload():
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        upload_status = "enable"
-        return render_template('upload.html', upload_status=upload_status)
+        return render_template('upload.html',  upload_status=check_authorized_status()['upload_status'])
+
+
 @application.route('/about')
 def about():
     """
 
     :return: about page
     """
-    return render_template("about.html")
+    return render_template("about.html", upload_status=check_authorized_status()['upload_status'])
 
 
 @application.route('/features')
@@ -101,7 +109,7 @@ def features():
 
     :return: features page
     """
-    return render_template("features.html")
+    return render_template("features.html", upload_status=check_authorized_status()['upload_status'])
 
 
 def beautify_response(text):

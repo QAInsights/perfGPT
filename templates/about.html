@@ -1,4 +1,15 @@
 {% extends 'layout.html' %}
+{% if upload_status == "enable" %}
+<nav class="navbar bg-primary" style="background-color: #0d6efd;" >
+  <div class="container">
+        <div class="navbar-header">
+<a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% else %}
+  <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% endif %}
+        </div>
+  </div>
+</nav>
 {% block contents %}
 <div class="container">
   <div class="accordion" id="accordionExample">
