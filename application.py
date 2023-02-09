@@ -2,7 +2,9 @@ import os
 import re
 import openai
 import pandas as pd
-from flask import Flask, request, render_template
+import boto3
+import time
+from flask import Flask, request, render_template, session
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
 
@@ -16,18 +18,48 @@ github_bp = make_github_blueprint()
 application.register_blueprint(github_bp, url_prefix="/login")
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
+dynamodb = boto3.resource('dynamodb',
+                          aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
+                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'])
+table = dynamodb.Table("perfgpt")
+
+# Images
+IMAGES_FOLDER = os.path.join('static', 'images')
+application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
+hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
+
+
 @application.route('/')
 def index():
     """
     index
     :return:    index page
     """
+    print(session)
+    if github.authorized:
+        print('User logged in')
+        upload_status = "enable"
+    else:
+        upload_status = "disable"
+        print('Not logged in')
+
     try:
         resp = github.get("/user")
         username = resp.json()["login"]
+        dbresponse = table.put_item(
+            Item={
+                "username": username,
+                "logged_in": int(time.time() * 1000),
+                "premium_user": False
+            }
+        )
+        print("DB response" + dbresponse)
+
+
     except Exception as e:
         username = ''
-    return render_template("index.html", username=username)
+
+    return render_template("index.html", image=hero_image, upload_status=upload_status)
 
 
 @application.route('/signin')
@@ -36,10 +68,24 @@ def github_sign():
         return redirect(url_for("github.login"))
     resp = github.get("/user")
     username = resp.json()["login"]
+    dbresponse = table.put_item(
+        Item={
+            "username": username,
+            "logged_in": int(time.time() * 1000),
+            "premium_user": False
+        }
+    )
+    print("DB response" + str(dbresponse))
     print(resp)
     return render_template("index.html", username=username)
 
-
+@application.route('/upload')
+def upload():
+    if not github.authorized:
+        return redirect(url_for("github.login"))
+    else:
+        upload_status = "enable"
+        return render_template('upload.html', upload_status=upload_status)
 @application.route('/about')
 def about():
     """

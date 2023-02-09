@@ -1,44 +1,39 @@
 {% extends 'layout.html' %}
+
+{% if upload_status == "enable" %}
+<nav class="navbar bg-primary" style="background-color: #0d6efd;" >
+  <div class="container">
+        <div class="navbar-header">
+<a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% else %}
+  <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% endif %}
+        </div>
+  </div>
+</nav>
+
 {% block contents %}
 <div class="container">
-    <div class="mt-4 p-5 bg-light rounded">
-        <div class="container">
-            <p class="lead fs-4">🤖 PerfGPT helps you to analyze your performance test results using OpenAI.</p>
-        </div>
-    </div>
-    <h4>Welcome {{ username }}</h4>
+    <div class="b-example-divider"></div>
 
-    <h1 class="display-6 fw-bold">Step 1:</h1>
-    <p class="lead">Upload raw data of your performance test using the tool of your choice.</p>
-    <p class="lead">Your privacy is paramount to us. We <strong>DO NOT store or read your file</strong>.</p>
-    <h3 class="display-6 fw-bold" style="font-weight: bold;">Step 2:</h3>
-    <p class="lead">OpenAI will analyze the results and present its findings.</p>
-    <hr/>
-    <h4>⬆️ Upload test results:</h4>
-    <div class="mb-3">
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <span class="input-group-btn">
-                <div class="row">
-                    <div class="col">
-                        <input class="form-control form-control-m" type="file" name="file">
-                    </div>
-                    <div class="col">
-                        <input class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
-                    </div>
-                </div>
-                <span class="fw-light">Supported file types: csv, json | Try with this</span><span class="fw-light">
-                <a href="https://github.com/QAInsights/perfGPT/blob/fea38951b1eb0c1ce2afc1b3d5ed3d1bd74f0536/run.csv"
-                target="_blank">sample data</a>.</span>
-            </span>
-        </form>
+  <div class="px-4 pt-5 my-5 text-center border-bottom">
+    <h1 class="display-4 fw-bold">🤖 PerfGPT</h1>
+    <div class="col-lg-6 mx-auto">
+      <p class="lead mb-4">Analyze your performance test results using OpenAI model.</p>
+        <p class="lead mb-4">In just <span style="font-size: larger;">2</span> steps</p>
+      <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
+        <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/signin')">Sign Up with GitHub</button>
+      </div>
+
+    </div>
+    <div class="overflow-hidden" style="max-height: 30vh;">
+      <div class="container px-5">
+        <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
+      </div>
+    </div>
+  </div>
     </div>
 <h1></h1>
-<div class="row">
-    <div class="spinner-grow mx-auto" id="loading" role="status" style="display: none;">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-    <span class="mb-3"></span>
-</div>
 {% endblock %}
 {% block body %}
 

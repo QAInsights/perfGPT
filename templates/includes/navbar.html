@@ -3,10 +3,12 @@
         <div class="navbar-header">
             <a class="navbar-brand" href="/" style="color: white">🤖 PerfGPT</a>
             <a class="navbar-brand" href="/about" style="color: white">About</a>
+            {% if upload_status == "enable" %}
+            <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+            {% endif %}
             <a class="navbar-brand" href="/features" style="color: white">Features</a>
             <a class="navbar-brand" href="https://github.com/QAInsights/perfGPT/issues/new" style="color: white"
                target="_blank">Feedback</a>
-            <a  style="color: white"  href="/signin" role="button">Sign in with GitHub</a>
         </div>
 
         <ul class="navbar-nav ml-auto">
