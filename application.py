@@ -18,11 +18,9 @@ logging.basicConfig(level=logging.INFO)
 application = Flask(__name__)
 # For CloudWatch
 handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream")
-handler.formatter.add_log_record_attrs=["levelname"]
+handler.formatter.add_log_record_attrs = ["levelname"]
 logger = logging.getLogger("perfgpt")
 logging.getLogger("perfgpt").addHandler(handler)
-
-
 
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
@@ -61,8 +59,8 @@ def index():
     """
     try:
         auth = check_authorized_status()
+        username = auth['username']
         logger.info({"message_type": "user_signin", "username": auth['username']})
-
 
     except Exception as e:
         username = ''
@@ -83,7 +81,7 @@ def upload():
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        return render_template('upload.html',  auth=check_authorized_status())
+        return render_template('upload.html', auth=check_authorized_status())
 
 
 @application.route('/about')
@@ -146,7 +144,8 @@ def askgpt_upload():
         return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status())
 
     if request.files['file'].filename == '':
-        return render_template('analysis_response.html', response="Please upload a valid file.", auth=check_authorized_status())
+        return render_template('analysis_response.html', response="Please upload a valid file.",
+                               auth=check_authorized_status())
 
     if request.method == 'POST':
         if request.files:
@@ -159,11 +158,12 @@ def askgpt_upload():
             except Exception as e:
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of the"
-                                                                          " supported formats.", 
-                                                                 auth=check_authorized_status())
+                                                                          " supported formats.",
+                                       auth=check_authorized_status())
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('analysis_response.html', response="File size too large.", auth=check_authorized_status())
+                return render_template('analysis_response.html', response="File size too large.",
+                                       auth=check_authorized_status())
             try:
                 responses = {}
                 for title, prompt in prompts.items():
@@ -181,11 +181,13 @@ def askgpt_upload():
                     response = beautify_response(response['choices'][0]['text'])
                     responses[title] = response
                     logger.info({"username": f"{username} uploaded data"})
-                return render_template("analysis_response.html", response=responses, username=username, auth=check_authorized_status())
+                return render_template("analysis_response.html", response=responses, username=username,
+                                       auth=check_authorized_status())
             except Exception as e:
                 return render_template("analysis_response.html", response=e, auth=check_authorized_status())
         else:
-            return render_template('analysis_response.html', response="Upload a valid file", auth=check_authorized_status())
+            return render_template('analysis_response.html', response="Upload a valid file",
+                                   auth=check_authorized_status())
 
 
 if __name__ == '__main__':
