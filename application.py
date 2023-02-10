@@ -1,16 +1,29 @@
 import os
 import re
+import time
+
+import boto3
+import logging
 import openai
 import pandas as pd
-import boto3
-import time
-from flask import Flask, request, render_template, session
+import watchtower
+from flask import Flask, request, render_template
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
 
 import constants
 
+logging.basicConfig(level=logging.INFO)
+
 application = Flask(__name__)
+# For CloudWatch
+handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream")
+handler.formatter.add_log_record_attrs=["levelname"]
+logger = logging.getLogger("perfgpt")
+logging.getLogger("perfgpt").addHandler(handler)
+
+
+
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
 application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
@@ -31,12 +44,10 @@ hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 
 def check_authorized_status():
     if github.authorized:
-        print('User logged in')
         upload_status = "enable"
         return {'logged_in': True, 'upload_status': upload_status}
     else:
         upload_status = "disable"
-        print('Not logged in')
         return {'logged_in': False, 'upload_status': upload_status}
 
 
@@ -46,23 +57,24 @@ def index():
     index
     :return:    index page
     """
-    print(session)
-    check_authorized_status()
-
     try:
         resp = github.get("/user")
         username = resp.json()["login"]
+        print(username)
         dbresponse = table.put_item(
             Item={
                 "username": username,
-                "logged_in": int(time.time() * 1000),
+                "datetime": str(int(time.time() * 1000)),
                 "premium_user": False
             }
         )
-        print("DB response" + dbresponse)
+        print("DB response" + str(dbresponse))
+        logger.info({"message_type": "user_signin", "username": username})
+
 
     except Exception as e:
         username = ''
+        print(e)
 
     return render_template("index.html", image=hero_image, upload_status=check_authorized_status()['upload_status'])
 
@@ -83,6 +95,7 @@ def github_sign():
     )
     print("DB response" + str(dbresponse))
     print(resp)
+    logger.info(username + "signed in")
     return render_template("index.html", username=username, upload_status=check_authorized_status()['upload_status'])
 
 
@@ -100,6 +113,7 @@ def about():
 
     :return: about page
     """
+    logger.info({"message_type": "user_signin", "username": "test"})
     return render_template("about.html", upload_status=check_authorized_status()['upload_status'])
 
 
@@ -186,6 +200,7 @@ def askgpt_upload():
                     )
                     response = beautify_response(response['choices'][0]['text'])
                     responses[title] = response
+                    logger.info({"username": f"{username} uploaded data"})
                 return render_template("analysis_response.html", response=responses, username=username)
             except Exception as e:
                 return render_template("analysis_response.html", response=e)
