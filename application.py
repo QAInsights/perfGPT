@@ -45,10 +45,12 @@ hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 def check_authorized_status():
     if github.authorized:
         upload_status = "enable"
-        return {'logged_in': True, 'upload_status': upload_status}
+        resp = github.get("/user")
+        username = resp.json()["login"]
+        return {'logged_in': True, 'upload_status': upload_status, 'username': username}
     else:
         upload_status = "disable"
-        return {'logged_in': False, 'upload_status': upload_status}
+        return {'logged_in': False, 'upload_status': upload_status, 'username': None}
 
 
 @application.route('/')
@@ -58,45 +60,22 @@ def index():
     :return:    index page
     """
     try:
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        print(username)
-        dbresponse = table.put_item(
-            Item={
-                "username": username,
-                "datetime": str(int(time.time() * 1000)),
-                "premium_user": False
-            }
-        )
-        print("DB response" + str(dbresponse))
-        logger.info({"message_type": "user_signin", "username": username})
+        auth = check_authorized_status()
+        logger.info({"message_type": "user_signin", "username": auth['username']})
 
 
     except Exception as e:
         username = ''
         print(e)
 
-    return render_template("index.html", image=hero_image, upload_status=check_authorized_status()['upload_status'])
+    return render_template("index.html", username=username, image=hero_image, auth=auth)
 
 
 @application.route('/signin')
 def github_sign():
-    check_authorized_status()
     if not github.authorized:
         return redirect(url_for("github.login"))
-    resp = github.get("/user")
-    username = resp.json()["login"]
-    dbresponse = table.put_item(
-        Item={
-            "username": username,
-            "datetime": str(int(time.time() * 1000)),
-            "premium_user": False
-        }
-    )
-    print("DB response" + str(dbresponse))
-    print(resp)
-    logger.info(username + "signed in")
-    return render_template("index.html", username=username, upload_status=check_authorized_status()['upload_status'])
+    return redirect('/')
 
 
 @application.route('/upload')
@@ -104,7 +83,7 @@ def upload():
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        return render_template('upload.html',  upload_status=check_authorized_status()['upload_status'])
+        return render_template('upload.html',  auth=check_authorized_status())
 
 
 @application.route('/about')
@@ -114,7 +93,7 @@ def about():
     :return: about page
     """
     logger.info({"message_type": "user_signin", "username": "test"})
-    return render_template("about.html", upload_status=check_authorized_status()['upload_status'])
+    return render_template("about.html", auth=check_authorized_status())
 
 
 @application.route('/features')
@@ -123,7 +102,7 @@ def features():
 
     :return: features page
     """
-    return render_template("features.html", upload_status=check_authorized_status()['upload_status'])
+    return render_template("features.html", auth=check_authorized_status())
 
 
 def beautify_response(text):
@@ -143,7 +122,7 @@ def beautify_response(text):
     return text
 
 
-@application.route('/upload', methods=['POST'])
+@application.route('/analyze', methods=['POST'])
 def askgpt_upload():
     """
     ask GPT
@@ -164,10 +143,10 @@ def askgpt_upload():
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
-        return render_template("analysis_response.html", response="API key not set.")
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status())
 
     if request.files['file'].filename == '':
-        return render_template('analysis_response.html', response="Please upload a valid file.")
+        return render_template('analysis_response.html', response="Please upload a valid file.", auth=check_authorized_status())
 
     if request.method == 'POST':
         if request.files:
@@ -180,10 +159,11 @@ def askgpt_upload():
             except Exception as e:
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of the"
-                                                                          " supported formats.")
+                                                                          " supported formats.", 
+                                                                 auth=check_authorized_status())
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('analysis_response.html', response="File size too large.")
+                return render_template('analysis_response.html', response="File size too large.", auth=check_authorized_status())
             try:
                 responses = {}
                 for title, prompt in prompts.items():
@@ -201,11 +181,11 @@ def askgpt_upload():
                     response = beautify_response(response['choices'][0]['text'])
                     responses[title] = response
                     logger.info({"username": f"{username} uploaded data"})
-                return render_template("analysis_response.html", response=responses, username=username)
+                return render_template("analysis_response.html", response=responses, username=username, auth=check_authorized_status())
             except Exception as e:
-                return render_template("analysis_response.html", response=e)
+                return render_template("analysis_response.html", response=e, auth=check_authorized_status())
         else:
-            return render_template('analysis_response.html', response="Upload a valid file")
+            return render_template('analysis_response.html', response="Upload a valid file", auth=check_authorized_status())
 
 
 if __name__ == '__main__':

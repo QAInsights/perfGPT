@@ -1,6 +1,6 @@
 {% extends 'layout.html' %}
 
-{% if upload_status == "enable" %}
+{% if auth['upload_status'] == "enable" %}
 <nav class="navbar bg-primary" style="background-color: #0d6efd;" >
   <div class="container">
         <div class="navbar-header">
@@ -22,7 +22,7 @@
       <p class="lead mb-4">Analyze your performance test results using OpenAI model.</p>
       <p class="lead mb-4">In just <span style="font-size: larger;">2</span> steps</p>
       <br/>
-      {% if upload_status == "enable" %}
+      {% if auth['upload_status'] == "enable" %}
             <div class="container">
                 <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
                   <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/upload', '_self')">Upload</button>
