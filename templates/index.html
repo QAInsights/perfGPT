@@ -4,45 +4,42 @@
 <nav class="navbar bg-primary" style="background-color: #0d6efd;" >
   <div class="container">
         <div class="navbar-header">
-<a class="navbar-brand" href="/upload" style="color: white">Upload</a>
-{% else %}
-  <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
-{% endif %}
+            <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+            {% else %}
+            <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+            {% endif %}
         </div>
   </div>
 </nav>
 
 {% block contents %}
 <div class="container">
-    <div class="b-example-divider"></div>
-
-  <div class="px-4 pt-5 my-5 text-center border-bottom">
-    <h1 class="display-4 fw-bold">🤖 PerfGPT</h1>
-    <div class="col-lg-6 mx-auto">
-      <p class="lead mb-4">Analyze your performance test results using OpenAI model.</p>
-      <p class="lead mb-4">In just <span style="font-size: larger;">2</span> steps</p>
-      <br/>
-      {% if auth['upload_status'] == "enable" %}
-            <div class="container">
-                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
-                  <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/upload', '_self')">Upload</button>
+    <div class="px-4 pt-5 my-5 text-center border-bottom">
+        <h1 class="display-4 fw-bold">🤖 PerfGPT</h1>
+        <div class="col-lg-6 mx-auto">
+              <p class="lead mb-4">Analyze your performance test results using OpenAI model.</p>
+              <p class="lead mb-4">In just <span style="font-size: larger;">2</span> steps</p>
+              <br/>
+              {% if auth['upload_status'] == "enable" %}
+                <div class="container">
+                    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
+                      <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/upload', '_self')">Upload</button>
+                    </div>
+                </div>
+              {% else %}
+                <div class="container">
+                    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
+                        <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/signin')">Login using GitHub</button>
+                    </div>
+                </div>
+              {% endif %}
+            <div class="overflow-hidden" style="max-height: 30vh;">
+              <div class="container px-5">
+                <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
+              </div>
             </div>
-          {% else %}
-            <div class="container">
-                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-5">
-                <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/signin')">Login using GitHub</button>
-            </div>
-      {% endif %}
-
-
+        </div>
     </div>
-    <div class="overflow-hidden" style="max-height: 30vh;">
-      <div class="container px-5">
-        <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
-      </div>
-    </div>
-  </div>
-    </div>
-<h1></h1>
+</div>
 
 {% endblock %}

@@ -1,19 +1,19 @@
+import logging
 import os
 import re
-import time
 
 import boto3
-import logging
 import openai
 import pandas as pd
 import watchtower
+from botocore.exceptions import ClientError
 from flask import Flask, request, render_template
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
-import werkzeug
 from werkzeug.exceptions import HTTPException
 
-import constants
+from . import _version
+from . import constants
 
 logging.basicConfig(level=logging.INFO)
 
@@ -43,6 +43,35 @@ hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
 
 
+def log_db(username, openai_id, openai_prompt_tokens, openai_completion_tokens, openai_total_tokens,
+           openai_created):
+    """
+
+    :param username:
+    :param openai_id:
+    :param openai_prompt_tokens:
+    :param openai_completion_tokens:
+    :param openai_total_tokens:
+    :param openai_created:
+    :return:
+    """
+    try:
+        db_response = table.put_item(
+            Item={
+                "username": username,
+                "datetime": str(openai_created),
+                "open_id": openai_id,
+                "openai_prompt_tokens": openai_prompt_tokens,
+                "openai_completion_tokens": openai_completion_tokens,
+                "openai_total_tokens": openai_total_tokens,
+                "premium_user": False
+            }
+        )
+        print(db_response)
+    except ClientError as e:
+        print(e)
+
+
 def check_authorized_status():
     if github.authorized:
         upload_status = "enable"
@@ -68,8 +97,8 @@ def index():
     except Exception as e:
         username = ''
         print(e)
-
-    return render_template("index.html", username=username, image=hero_image, auth=auth)
+    print("The version " + str(_version.__version__))
+    return render_template("index.html", username=username, image=hero_image, auth=auth, version=_version.__version__)
 
 
 @application.errorhandler(HTTPException)
@@ -77,7 +106,7 @@ def page_not_found():
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status())
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(), version=_version.__version__)
     try:
         response = openai.Completion.create(
             model=constants.model,
@@ -90,11 +119,11 @@ def page_not_found():
             frequency_penalty=constants.frequency_penalty,
             presence_penalty=constants.presence_penalty
         )
-        print(response)
-        return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'], username='', auth=check_authorized_status())
+        return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'],
+                               username='', auth=check_authorized_status())
     except Exception as e:
-        return render_template("invalid.html", image=invalid_image, response=e, username='', auth=check_authorized_status())
-
+        return render_template("invalid.html", image=invalid_image, response=e, username='',
+                               auth=check_authorized_status(), version=_version.__version__)
 
 
 @application.route('/signin')
@@ -109,7 +138,7 @@ def upload():
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        return render_template('upload.html', auth=check_authorized_status())
+        return render_template('upload.html', auth=check_authorized_status(), version=_version.__version__)
 
 
 @application.route('/about')
@@ -119,7 +148,7 @@ def about():
     :return: about page
     """
     logger.info({"message_type": "user_signin", "username": "test"})
-    return render_template("about.html", auth=check_authorized_status())
+    return render_template("about.html", auth=check_authorized_status(), version=_version.__version__)
 
 
 @application.route('/features')
@@ -128,7 +157,7 @@ def features():
 
     :return: features page
     """
-    return render_template("features.html", auth=check_authorized_status())
+    return render_template("features.html", auth=check_authorized_status(), version=_version.__version__)
 
 
 def beautify_response(text):
@@ -169,11 +198,11 @@ def askgpt_upload():
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status())
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(), version=_version.__version__)
 
     if request.files['file'].filename == '':
         return render_template('analysis_response.html', response="Please upload a valid file.",
-                               auth=check_authorized_status())
+                               auth=check_authorized_status(), version=_version.__version__)
 
     if request.method == 'POST':
         if request.files:
@@ -187,11 +216,11 @@ def askgpt_upload():
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of the"
                                                                           " supported formats.",
-                                       auth=check_authorized_status())
+                                       auth=check_authorized_status(), version=_version.__version__)
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
                 return render_template('analysis_response.html', response="File size too large.",
-                                       auth=check_authorized_status())
+                                       auth=check_authorized_status(), version=_version.__version__)
             try:
                 responses = {}
                 for title, prompt in prompts.items():
@@ -206,16 +235,25 @@ def askgpt_upload():
                         frequency_penalty=constants.frequency_penalty,
                         presence_penalty=constants.presence_penalty
                     )
-                    response = beautify_response(response['choices'][0]['text'])
-                    responses[title] = response
+                    print(response)
                     logger.info({"username": f"{username} uploaded data"})
+
+                    log_db(username=username, openai_id=response['id'],
+                           openai_prompt_tokens=response['usage']['prompt_tokens'],
+                           openai_completion_tokens=response['usage']['completion_tokens'],
+                           openai_total_tokens=response['usage']['total_tokens'],
+                           openai_created=response['created'])
+
+                    response = beautify_response(response['choices'][0]['text'])
+
+                    responses[title] = response
                 return render_template("analysis_response.html", response=responses, username=username,
-                                       auth=check_authorized_status())
+                                       auth=check_authorized_status(), version=_version.__version__)
             except Exception as e:
-                return render_template("analysis_response.html", response=e, auth=check_authorized_status())
+                return render_template("analysis_response.html", response=e, auth=check_authorized_status(), version=_version.__version__)
         else:
             return render_template('analysis_response.html', response="Upload a valid file",
-                                   auth=check_authorized_status())
+                                   auth=check_authorized_status(), version=_version.__version__)
 
 
 if __name__ == '__main__':
