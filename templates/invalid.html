@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+
+{% if auth['upload_status'] == "enable" %}
+<nav class="navbar bg-primary" style="background-color: #0d6efd;" >
+  <div class="container">
+        <div class="navbar-header">
+<a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% else %}
+  <a class="navbar-brand" href="/upload" style="color: white">Upload</a>
+{% endif %}
+        </div>
+  </div>
+</nav>
+
+{% block contents %}
+<div class="container">
+    <div class="b-example-divider"></div>
+
+  <div class="px-4 pt-5 my-5 text-center border-bottom">
+    <h1 class="display-4 fw-bold">❌ Uh! oh!</h1>
+        <p class="lead">{{ response | replace("\n", "<br>" | safe) }}</p>
+
+    </div>
+    <div class="overflow-hidden" style="max-height: 30vh;">
+      <div class="container px-5">
+        <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
+      </div>
+    </div>
+  </div>
+    </div>
+<h1></h1>
+
+{% endblock %}

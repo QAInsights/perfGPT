@@ -10,6 +10,8 @@ import watchtower
 from flask import Flask, request, render_template
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
+import werkzeug
+from werkzeug.exceptions import HTTPException
 
 import constants
 
@@ -38,6 +40,7 @@ table = dynamodb.Table("perfgpt")
 IMAGES_FOLDER = os.path.join('static', 'images')
 application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
 hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
+invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
 
 
 def check_authorized_status():
@@ -67,6 +70,31 @@ def index():
         print(e)
 
     return render_template("index.html", username=username, image=hero_image, auth=auth)
+
+
+@application.errorhandler(HTTPException)
+def page_not_found():
+    try:
+        openai.api_key = os.environ['OPENAI_API_KEY']
+    except KeyError:
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status())
+    try:
+        response = openai.Completion.create(
+            model=constants.model,
+            prompt=f"""
+            write a four line haiku about invalid page request
+            """,
+            temperature=constants.temperature,
+            max_tokens=constants.max_tokens,
+            top_p=constants.top_p,
+            frequency_penalty=constants.frequency_penalty,
+            presence_penalty=constants.presence_penalty
+        )
+        print(response)
+        return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'], username='', auth=check_authorized_status())
+    except Exception as e:
+        return render_template("invalid.html", image=invalid_image, response=e, username='', auth=check_authorized_status())
+
 
 
 @application.route('/signin')
