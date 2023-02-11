@@ -19,10 +19,11 @@ logging.basicConfig(level=logging.INFO)
 
 application = Flask(__name__)
 # For CloudWatch
-handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream")
-handler.formatter.add_log_record_attrs = ["levelname"]
-logger = logging.getLogger("perfgpt")
-logging.getLogger("perfgpt").addHandler(handler)
+# handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream",
+#                                           region_name=constants.AWS_DEFAULT_REGION)
+# handler.formatter.add_log_record_attrs = ["levelname"]
+# logger = logging.getLogger("perfgpt")
+# logging.getLogger("perfgpt").addHandler(handler)
 
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
@@ -173,7 +174,7 @@ def about():
 
     :return: about page
     """
-    logger.info({"message_type": "user_signin", "username": "test"})
+    # logger.info({"message_type": "user_signin", "username": "test"})
     return render_template("about.html", auth=check_authorized_status(), version=version.__version__)
 
 
@@ -299,8 +300,8 @@ def askgpt_upload():
                             frequency_penalty=constants.frequency_penalty,
                             presence_penalty=constants.presence_penalty
                         )
-                        print(response)
-                        logger.info({"username": f"{username} uploaded data"})
+                        # print(response)
+                        # logger.info({"username": f"{username} uploaded data"})
 
                         log_db(username=username, openai_id=response['id'],
                                openai_prompt_tokens=response['usage']['prompt_tokens'],
