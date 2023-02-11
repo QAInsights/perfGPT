@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-
+import json
 import boto3
 import openai
 import pandas as pd
@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 from flask import Flask, request, render_template
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
+from boto3.dynamodb.conditions import Key, And
 from werkzeug.exceptions import HTTPException
 
 from . import _version
@@ -78,7 +79,7 @@ def check_authorized_status():
         username = resp.json()["login"]
         return {'logged_in': True, 'username': username, 'upload_status': 1}
     else:
-        return {'logged_in': False, 'username': '', 'upload_status': 0}
+        return {'logged_in': False, 'username': None, 'upload_status': 0}
 
 
 @application.route('/')
@@ -97,7 +98,8 @@ def index():
     except Exception as e:
         username = ''
         print(e)
-        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(), version=_version.__version__)
+        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
+                               version=_version.__version__)
 
 
 @application.errorhandler(Exception)
@@ -167,6 +169,36 @@ def features():
     :return: features page
     """
     return render_template("features.html", auth=check_authorized_status(), version=_version.__version__)
+
+
+def get_analysis(username):
+    response = table.query(KeyConditionExpression=Key('username').eq(username))
+    total_count = response['Count']
+    print(total_count)
+    print(json.dumps(response['Items']))
+    for i, j in json.dumps(response['Items']).items():
+         print(i, j)
+
+    # for k,v in response.items():
+    #     print(k, type(k), v, type(v))
+
+
+    return response
+
+
+@application.route('/account')
+def account():
+    """
+
+    :return:
+    """
+    try:
+        username = check_authorized_status()['username']
+        print(username)
+        get_analysis(username)
+    except Exception as e:
+        print(e)
+    return render_template("account.html", auth=check_authorized_status(), version=_version.__version__)
 
 
 def beautify_response(text):
