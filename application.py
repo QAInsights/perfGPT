@@ -33,7 +33,8 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 dynamodb = boto3.resource('dynamodb',
                           aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
-                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'])
+                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
+                          region_name=constants.AWS_DEFAULT_REGION)
 table = dynamodb.Table("perfgpt")
 
 # Images
