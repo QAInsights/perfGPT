@@ -1,16 +1,14 @@
 {% extends 'upload.html' %}
 {% block body %}
-
-{% for key, value in response.items() %}
-    <div class="card bg-primary">
-          <div class="card-header">
-            <h3 class="card-title" style="color: white">📊 {{ key }}</h3>
-          </div>
-          <div class="card-body bg-light">
-            {{ value|safe }}
-          </div>
-    </div>
-    <br/>
- {% endfor %}
-
+    {% for key, value in response.items() %}
+        <div class="card bg-primary">
+              <div class="card-header">
+                <h3 class="card-title" style="color: white">📊 {{ key }}</h3>
+              </div>
+              <div class="card-body bg-light">
+                {{ value|safe }}
+              </div>
+        </div>
+        <br/>
+     {% endfor %}
 {% endblock %}

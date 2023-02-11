@@ -11,7 +11,6 @@ from flask import Flask, request, render_template
 from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
 from boto3.dynamodb.conditions import Key, And
-from werkzeug.exceptions import HTTPException
 
 from . import _version
 from . import constants
@@ -44,8 +43,8 @@ hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
 
 
-def log_db(username, openai_id, openai_prompt_tokens, openai_completion_tokens, openai_total_tokens,
-           openai_created):
+def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
+           openai_created=None):
     """
 
     :param username:
@@ -60,6 +59,7 @@ def log_db(username, openai_id, openai_prompt_tokens, openai_completion_tokens, 
         db_response = table.put_item(
             Item={
                 "username": username,
+                "inital_upload_limit": 10,
                 "datetime": str(openai_created),
                 "open_id": openai_id,
                 "openai_prompt_tokens": openai_prompt_tokens,
@@ -68,7 +68,17 @@ def log_db(username, openai_id, openai_prompt_tokens, openai_completion_tokens, 
                 "premium_user": False
             }
         )
-        print(db_response)
+
+    except ClientError as e:
+        print(e)
+
+
+def get_upload_count(username):
+    try:
+        response = table.query(KeyConditionExpression=Key('username').eq(username))
+        total_count = response['Count']
+        return int(total_count)
+
     except ClientError as e:
         print(e)
 
@@ -92,6 +102,7 @@ def index():
         if github.authorized:
             resp = github.get("/user")
             username = resp.json()["login"]
+            log_db(username=username)
         return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
                                version=_version.__version__)
 
@@ -114,11 +125,8 @@ def page_not_found(error):
         username = auth['username']
         if auth['logged_in']:
             auth['upload_status'] = 1
-            print(auth['upload_status'])
-            print(auth)
         else:
             auth['upload_status'] = 0
-        print(auth)
         response = openai.Completion.create(
             model=constants.model,
             prompt=f"""
@@ -146,10 +154,16 @@ def github_sign():
 
 @application.route('/upload')
 def upload():
-    if not github.authorized:
-        return redirect(url_for("github.login"))
-    else:
-        return render_template('upload.html', auth=check_authorized_status(), version=_version.__version__)
+    try:
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+        else:
+            upload_count = get_upload_count(check_authorized_status()['username']) - 1
+            return render_template('upload.html', auth=check_authorized_status(),
+                                   upload_count=upload_count,
+                                   version=_version.__version__)
+    except Exception as e:
+        print(e)
 
 
 @application.route('/about')
@@ -172,18 +186,16 @@ def features():
 
 
 def get_analysis(username):
-    response = table.query(KeyConditionExpression=Key('username').eq(username))
-    total_count = response['Count']
-    print(total_count)
-    print(json.dumps(response['Items']))
-    for i, j in json.dumps(response['Items']).items():
-         print(i, j)
+    # response = table.query(KeyConditionExpression=Key('username').eq(username))
+    # total_count = response['Count']
+    # print(json.dumps(response['Items']))
+    # for i, j in json.dumps(response['Items']).items():
+    # print(i, j)
+    # pass
 
     # for k,v in response.items():
     #     print(k, type(k), v, type(v))
-
-
-    return response
+    pass
 
 
 @application.route('/account')
@@ -194,7 +206,6 @@ def account():
     """
     try:
         username = check_authorized_status()['username']
-        print(username)
         get_analysis(username)
     except Exception as e:
         print(e)
@@ -231,72 +242,89 @@ def askgpt_upload():
         "Detailed Summary": "Act like a performance engineer and write a detailed summary from this raw performance "
                             "results."
     }
-    if not github.authorized:
-        return redirect(url_for("github.login"))
-    resp = github.get("/user")
-    username = resp.json()["login"]
-
     try:
-        openai.api_key = os.environ['OPENAI_API_KEY']
-    except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(),
-                               version=_version.__version__)
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+        resp = github.get("/user")
+        username = resp.json()["login"]
+        upload_count = get_upload_count(check_authorized_status()['username']) - 1
+        print("Upload count " + str(upload_count))
+        try:
+            openai.api_key = os.environ['OPENAI_API_KEY']
+        except KeyError:
+            return render_template("analysis_response.html", response="API key not set.",
+                                   auth=check_authorized_status(),
+                                   upload_count=upload_count,
+                                   version=_version.__version__)
 
-    if request.files['file'].filename == '':
-        return render_template('analysis_response.html', response="Please upload a valid file.",
-                               auth=check_authorized_status(), version=_version.__version__)
+        if request.files['file'].filename == '':
+            return render_template('analysis_response.html', response="Please upload a valid file.",
+                                   auth=check_authorized_status(),
+                                   upload_count=upload_count,
+                                   version=_version.__version__)
 
-    if request.method == 'POST':
-        if request.files:
-            file = request.files['file']
-            try:
-                if file.filename.endswith('.csv'):
-                    contents = pd.read_csv(file)
-                if file.filename.endswith('.json'):
-                    contents = pd.read_json(file)
-            except Exception as e:
-                return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
-                                                                          "the file is not empty and is in one of the"
-                                                                          " supported formats.",
-                                       auth=check_authorized_status(), version=_version.__version__)
+        if request.method == 'POST':
+            if request.files:
+                file = request.files['file']
+                try:
+                    if file.filename.endswith('.csv'):
+                        contents = pd.read_csv(file)
+                    if file.filename.endswith('.json'):
+                        contents = pd.read_json(file)
+                except Exception as e:
+                    return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
+                                                                              "the file is not empty and is in one of the"
+                                                                              " supported formats.",
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=_version.__version__)
 
-            if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('analysis_response.html', response="File size too large.",
-                                       auth=check_authorized_status(), version=_version.__version__)
-            try:
-                responses = {}
-                for title, prompt in prompts.items():
-                    response = openai.Completion.create(
-                        model=constants.model,
-                        prompt=f"""
-                        {prompt}: \n {contents}
-                        """,
-                        temperature=constants.temperature,
-                        max_tokens=constants.max_tokens,
-                        top_p=constants.top_p,
-                        frequency_penalty=constants.frequency_penalty,
-                        presence_penalty=constants.presence_penalty
-                    )
-                    print(response)
-                    logger.info({"username": f"{username} uploaded data"})
+                if contents.memory_usage().sum() > constants.FILE_SIZE:
+                    return render_template('analysis_response.html', response="File size too large.",
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=_version.__version__)
+                try:
+                    responses = {}
+                    for title, prompt in prompts.items():
+                        response = openai.Completion.create(
+                            model=constants.model,
+                            prompt=f"""
+                            {prompt}: \n {contents}
+                            """,
+                            temperature=constants.temperature,
+                            max_tokens=constants.max_tokens,
+                            top_p=constants.top_p,
+                            frequency_penalty=constants.frequency_penalty,
+                            presence_penalty=constants.presence_penalty
+                        )
+                        print(response)
+                        logger.info({"username": f"{username} uploaded data"})
 
-                    log_db(username=username, openai_id=response['id'],
-                           openai_prompt_tokens=response['usage']['prompt_tokens'],
-                           openai_completion_tokens=response['usage']['completion_tokens'],
-                           openai_total_tokens=response['usage']['total_tokens'],
-                           openai_created=response['created'])
+                        log_db(username=username, openai_id=response['id'],
+                               openai_prompt_tokens=response['usage']['prompt_tokens'],
+                               openai_completion_tokens=response['usage']['completion_tokens'],
+                               openai_total_tokens=response['usage']['total_tokens'],
+                               openai_created=response['created'])
 
-                    response = beautify_response(response['choices'][0]['text'])
+                        response = beautify_response(response['choices'][0]['text'])
 
-                    responses[title] = response
-                return render_template("analysis_response.html", response=responses, username=username,
-                                       auth=check_authorized_status(), version=_version.__version__)
-            except Exception as e:
-                return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+                        responses[title] = response
+                    return render_template("analysis_response.html", response=responses, username=username,
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=_version.__version__)
+                except Exception as e:
+                    return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=_version.__version__)
+            else:
+                return render_template('analysis_response.html', response="Upload a valid file",
+                                       auth=check_authorized_status(),
+                                       upload_count=upload_count,
                                        version=_version.__version__)
-        else:
-            return render_template('analysis_response.html', response="Upload a valid file",
-                                   auth=check_authorized_status(), version=_version.__version__)
+    except Exception as e:
+        print(e)
 
 
 if __name__ == '__main__':

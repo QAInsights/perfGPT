@@ -1,4 +1,5 @@
 FILE_SIZE = 100_000_000
+MONTHLY_UPLOAD_LIMIT = 10
 model = "text-davinci-003"
 temperature = 0
 max_tokens = 1000
