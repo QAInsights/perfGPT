@@ -161,9 +161,15 @@ def upload():
             return redirect(url_for("github.login"))
         else:
             upload_count = get_upload_count(check_authorized_status()['username']) - 1
-            return render_template('upload.html', auth=check_authorized_status(),
-                                   upload_count=upload_count,
-                                   version=version.__version__)
+            print(upload_count)
+            if upload_count == 0:
+                return render_template('upload.html', auth=check_authorized_status(),
+                                       upload_count=0,
+                                       version=version.__version__)
+            else:
+                return render_template('upload.html', auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       version=version.__version__)
     except Exception as e:
         print(e)
 
