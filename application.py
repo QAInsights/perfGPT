@@ -74,13 +74,11 @@ def log_db(username, openai_id, openai_prompt_tokens, openai_completion_tokens, 
 
 def check_authorized_status():
     if github.authorized:
-        upload_status = "enable"
         resp = github.get("/user")
         username = resp.json()["login"]
-        return {'logged_in': True, 'upload_status': upload_status, 'username': username}
+        return {'logged_in': True, 'username': username, 'upload_status': 1}
     else:
-        upload_status = "disable"
-        return {'logged_in': False, 'upload_status': upload_status, 'username': None}
+        return {'logged_in': False, 'username': '', 'upload_status': 0}
 
 
 @application.route('/')
@@ -90,24 +88,35 @@ def index():
     :return:    index page
     """
     try:
-        auth = check_authorized_status()
-        username = auth['username']
-        logger.info({"message_type": "user_signin", "username": auth['username']})
+        if github.authorized:
+            resp = github.get("/user")
+            username = resp.json()["login"]
+        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
+                               version=_version.__version__)
 
     except Exception as e:
         username = ''
         print(e)
-    print("The version " + str(_version.__version__))
-    return render_template("index.html", username=username, image=hero_image, auth=auth, version=_version.__version__)
+        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(), version=_version.__version__)
 
 
-@application.errorhandler(HTTPException)
-def page_not_found():
+@application.errorhandler(Exception)
+def page_not_found(error):
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(), version=_version.__version__)
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(),
+                               version=_version.__version__)
     try:
+        auth = check_authorized_status()
+        username = auth['username']
+        if auth['logged_in']:
+            auth['upload_status'] = 1
+            print(auth['upload_status'])
+            print(auth)
+        else:
+            auth['upload_status'] = 0
+        print(auth)
         response = openai.Completion.create(
             model=constants.model,
             prompt=f"""
@@ -120,7 +129,7 @@ def page_not_found():
             presence_penalty=constants.presence_penalty
         )
         return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'],
-                               username='', auth=check_authorized_status())
+                               username='', auth=check_authorized_status(), version=_version.__version__)
     except Exception as e:
         return render_template("invalid.html", image=invalid_image, response=e, username='',
                                auth=check_authorized_status(), version=_version.__version__)
@@ -198,7 +207,8 @@ def askgpt_upload():
     try:
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(), version=_version.__version__)
+        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(),
+                               version=_version.__version__)
 
     if request.files['file'].filename == '':
         return render_template('analysis_response.html', response="Please upload a valid file.",
@@ -250,7 +260,8 @@ def askgpt_upload():
                 return render_template("analysis_response.html", response=responses, username=username,
                                        auth=check_authorized_status(), version=_version.__version__)
             except Exception as e:
-                return render_template("analysis_response.html", response=e, auth=check_authorized_status(), version=_version.__version__)
+                return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+                                       version=_version.__version__)
         else:
             return render_template('analysis_response.html', response="Upload a valid file",
                                    auth=check_authorized_status(), version=_version.__version__)
