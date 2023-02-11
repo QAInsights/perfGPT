@@ -12,8 +12,8 @@ from flask import redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
 from boto3.dynamodb.conditions import Key, And
 
-from . import _version
-from . import constants
+import constants
+import version
 
 logging.basicConfig(level=logging.INFO)
 
@@ -104,13 +104,13 @@ def index():
             username = resp.json()["login"]
             log_db(username=username)
         return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
-                               version=_version.__version__)
+                               version=version.__version__)
 
     except Exception as e:
         username = ''
         print(e)
         return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
-                               version=_version.__version__)
+                               version=version.__version__)
 
 
 @application.errorhandler(Exception)
@@ -119,7 +119,7 @@ def page_not_found(error):
         openai.api_key = os.environ['OPENAI_API_KEY']
     except KeyError:
         return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(),
-                               version=_version.__version__)
+                               version=version.__version__)
     try:
         auth = check_authorized_status()
         username = auth['username']
@@ -139,10 +139,10 @@ def page_not_found(error):
             presence_penalty=constants.presence_penalty
         )
         return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'],
-                               username='', auth=check_authorized_status(), version=_version.__version__)
+                               username='', auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
         return render_template("invalid.html", image=invalid_image, response=e, username='',
-                               auth=check_authorized_status(), version=_version.__version__)
+                               auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/signin')
@@ -161,7 +161,7 @@ def upload():
             upload_count = get_upload_count(check_authorized_status()['username']) - 1
             return render_template('upload.html', auth=check_authorized_status(),
                                    upload_count=upload_count,
-                                   version=_version.__version__)
+                                   version=version.__version__)
     except Exception as e:
         print(e)
 
@@ -173,7 +173,7 @@ def about():
     :return: about page
     """
     logger.info({"message_type": "user_signin", "username": "test"})
-    return render_template("about.html", auth=check_authorized_status(), version=_version.__version__)
+    return render_template("about.html", auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/features')
@@ -182,7 +182,7 @@ def features():
 
     :return: features page
     """
-    return render_template("features.html", auth=check_authorized_status(), version=_version.__version__)
+    return render_template("features.html", auth=check_authorized_status(), version=version.__version__)
 
 
 def get_analysis(username):
@@ -209,7 +209,7 @@ def account():
         get_analysis(username)
     except Exception as e:
         print(e)
-    return render_template("account.html", auth=check_authorized_status(), version=_version.__version__)
+    return render_template("account.html", auth=check_authorized_status(), version=version.__version__)
 
 
 def beautify_response(text):
@@ -255,13 +255,13 @@ def askgpt_upload():
             return render_template("analysis_response.html", response="API key not set.",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
-                                   version=_version.__version__)
+                                   version=version.__version__)
 
         if request.files['file'].filename == '':
             return render_template('analysis_response.html', response="Please upload a valid file.",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
-                                   version=_version.__version__)
+                                   version=version.__version__)
 
         if request.method == 'POST':
             if request.files:
@@ -277,13 +277,13 @@ def askgpt_upload():
                                                                               " supported formats.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
-                                           version=_version.__version__)
+                                           version=version.__version__)
 
                 if contents.memory_usage().sum() > constants.FILE_SIZE:
                     return render_template('analysis_response.html', response="File size too large.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
-                                           version=_version.__version__)
+                                           version=version.__version__)
                 try:
                     responses = {}
                     for title, prompt in prompts.items():
@@ -313,16 +313,16 @@ def askgpt_upload():
                     return render_template("analysis_response.html", response=responses, username=username,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
-                                           version=_version.__version__)
+                                           version=version.__version__)
                 except Exception as e:
                     return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
                                            upload_count=upload_count,
-                                           version=_version.__version__)
+                                           version=version.__version__)
             else:
                 return render_template('analysis_response.html', response="Upload a valid file",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
-                                       version=_version.__version__)
+                                       version=version.__version__)
     except Exception as e:
         print(e)
 
