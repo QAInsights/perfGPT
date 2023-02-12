@@ -8,7 +8,7 @@ import pandas as pd
 import watchtower
 from botocore.exceptions import ClientError
 from flask import Flask, request, render_template
-from flask import redirect, url_for
+from flask import redirect, url_for, send_from_directory
 from flask_dance.contrib.github import make_github_blueprint, github
 from boto3.dynamodb.conditions import Key, And
 
@@ -94,6 +94,10 @@ def check_authorized_status():
     else:
         return {'logged_in': False, 'username': None, 'upload_status': 0}
 
+@application.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(application.root_path, 'static'),
+        'favicon.ico',mimetype='image/vnd.microsoft.icon')
 
 @application.route('/')
 def index():
