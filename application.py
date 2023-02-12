@@ -28,6 +28,7 @@ application = Flask(__name__)
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
 application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+application.config["PREFERRED_URL_SCHEME"] = "https"
 github_bp = make_github_blueprint()
 application.register_blueprint(github_bp, url_prefix="/login")
 # os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
