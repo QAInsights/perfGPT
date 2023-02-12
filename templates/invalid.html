@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+
+{% block contents %}
+<div class="container">
+     <div class="px-4 pt-5 my-5 text-center border-bottom">
+          <h1 class="display-4 fw-bold">❌ Uh! oh!</h1>
+            <p class="lead">{{ response | replace("\n", "<br>" | safe) }}</p>
+        <div class="alert alert-info" role="alert">
+            <p class="lead"><i class="fas fa-bug"></i> If you still think it is a bug, please raise an issue <a href="https://github.com/QAInsights/perfGPT/issues/new" target="_blank">here</a>.</p>
+        </div>
+      </div>
+    <div class="overflow-hidden" style="max-height: 30vh;">
+        <div class="container px-5" align="center">
+          <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
+        </div>
+    </div>
+</div>
+
+{% endblock %}
