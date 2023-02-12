@@ -32,7 +32,7 @@ application.config["PREFERRED_URL_SCHEME"] = "https"
 github_bp = make_github_blueprint(
 client_id=os.environ['GITHUB_OAUTH_CLIENT_ID'],
     client_secret=os.environ['GITHUB_OAUTH_CLIENT_SECRET'],
-    redirect_url="https://perfgpt.qainsights.com/github/callback"
+    redirect_url="https://perfgpt.qainsights.com/login/github/authorized"
 )
 application.register_blueprint(github_bp, url_prefix="/login")
 # os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
