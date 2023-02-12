@@ -5,7 +5,6 @@ import json
 import boto3
 import openai
 import pandas as pd
-import watchtower
 from botocore.exceptions import ClientError
 from flask import Flask, request, render_template
 from flask import redirect, url_for, send_from_directory
@@ -16,17 +15,23 @@ import constants
 import version
 
 logging.basicConfig(level=logging.INFO)
+
+
 class ReverseProxied(object):
     def __init__(self, app):
         self.app = app
 
     def __call__(self, environ, start_response):
-        scheme = environ.get('HTTP_X_FORWARDED_PROTO')
-        if scheme:
-            environ['wsgi.url_scheme'] = scheme
+        # if one of x_forwarded or preferred_url is https, prefer it.
+        forwarded_scheme = environ.get("HTTP_X_FORWARDED_PROTO", None)
+        preferred_scheme = application.config.get("PREFERRED_URL_SCHEME", None)
+        if "https" in [forwarded_scheme, preferred_scheme]:
+            environ["wsgi.url_scheme"] = "https"
         return self.app(environ, start_response)
 
+
 application = Flask(__name__)
+
 # For CloudWatch
 # handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream",
 #                                           region_name=constants.AWS_DEFAULT_REGION)
@@ -37,7 +42,6 @@ application = Flask(__name__)
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
 application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
-application.config["PREFERRED_URL_SCHEME"] = "https"
 github_bp = make_github_blueprint()
 
 application.wsgi_app = ReverseProxied(application.wsgi_app)
