@@ -1,0 +1,32 @@
+{% extends 'layout.html' %}
+{% block contents %}
+<div class="container">
+  <h1>Help</h1><br/>
+  <p class="lead">
+    This page guides you to gather the performance results in csv format from commonly used tools.
+  </p>
+
+  <h4>🪶 JMeter results</h4>
+  <p class="lead">
+    By default, JMeter stores the result in csv format. For more details, please check the JMeter <a href="https://jmeter.apache.org/usermanual/component_reference.html#listeners" target="_blank">documentation</a>.
+  </p>
+  <h4>🐊 k6 results</h4>
+  <p class="lead">
+    k6 allows you to export the results to csv. Please check this <a href="https://k6.io/docs/results-output/real-time/csv/" target="_blank">documentation</a> for more details.
+  </p>
+  <h4>🐍 Locust</h4>
+  <p class="lead">
+    Consume your Locust results in csv format using this <a href="https://docs.locust.io/en/stable/retrieving-stats.html" target="_blank">documentation</a>.
+  </p>
+  <h4>⚒️ Gatling</h4>
+  <p class="lead">
+    Gatling doesn't have a native support for csv. Please check <a href="https://github.com/nuxeo/gatling-report" target="_blank">this repo</a> to export.
+  </p>
+</div>
+<br>
+<div class="container">
+  <p class="lead">
+    Is something missing in this page? Please contribute to <a href="https://github.com/QAInsights/perfGPT/issues/new" target="_blank">our repo</a>.
+  </p>
+</div>
+{% endblock %}

@@ -36,7 +36,7 @@ dynamodb = boto3.resource('dynamodb',
                           aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
                           aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
                           region_name=constants.AWS_DEFAULT_REGION)
-table = dynamodb.Table("perfgpt")
+table = dynamodb.Table(constants.dynamodb_table)
 
 # Images
 IMAGES_FOLDER = os.path.join('static', 'images')
@@ -79,7 +79,6 @@ def get_upload_count(username):
     try:
         response = table.query(KeyConditionExpression=Key('username').eq(username))
         total_count = response['Count']
-        print()
         return int(total_count)
 
     except ClientError as e:
@@ -94,10 +93,12 @@ def check_authorized_status():
     else:
         return {'logged_in': False, 'username': None, 'upload_status': 0}
 
+
 @application.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(application.root_path, 'static'),
-        'favicon.ico',mimetype='image/vnd.microsoft.icon')
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 
 @application.route('/')
 def index():
@@ -156,6 +157,9 @@ def page_not_found(error):
 def github_sign():
     if not github.authorized:
         return redirect(url_for("github.login"))
+    else:
+        username = check_authorized_status()['username']
+        log_db(username=username)
     return redirect('/')
 
 
@@ -195,6 +199,15 @@ def features():
     :return: features page
     """
     return render_template("features.html", auth=check_authorized_status(), version=version.__version__)
+
+
+@application.route('/help')
+def help_page():
+    """
+
+    :return: help page
+    """
+    return render_template("help.html", auth=check_authorized_status(), version=version.__version__)
 
 
 def get_analysis(username):
