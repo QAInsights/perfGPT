@@ -30,7 +30,7 @@ application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_I
 application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
 github_bp = make_github_blueprint()
 application.register_blueprint(github_bp, url_prefix="/login")
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 dynamodb = boto3.resource('dynamodb',
                           aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
