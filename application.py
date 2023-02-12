@@ -79,6 +79,7 @@ def get_upload_count(username):
     try:
         response = table.query(KeyConditionExpression=Key('username').eq(username))
         total_count = response['Count']
+        print()
         return int(total_count)
 
     except ClientError as e:
@@ -161,7 +162,6 @@ def upload():
             return redirect(url_for("github.login"))
         else:
             upload_count = get_upload_count(check_authorized_status()['username']) - 1
-            print(upload_count)
             if upload_count == 0:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=0,
