@@ -44,6 +44,9 @@ application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_I
 application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
 github_bp = make_github_blueprint()
 
+application.config.update(dict(
+  PREFERRED_URL_SCHEME = 'https'
+))
 application.wsgi_app = ReverseProxied(application.wsgi_app)
 
 application.register_blueprint(github_bp, url_prefix="/login")
