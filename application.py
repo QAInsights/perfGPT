@@ -10,7 +10,7 @@ from flask import Flask, request, render_template
 from flask import redirect, url_for, send_from_directory
 from flask_dance.contrib.github import make_github_blueprint, github
 from boto3.dynamodb.conditions import Key, And
-
+from integrations.slack.slack import send_slack_notifications
 import constants
 import version
 
@@ -66,7 +66,7 @@ invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a
 
 
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
-           openai_created=None):
+           openai_created=None, slack_webhook=None):
     """
 
     :param username:
@@ -87,6 +87,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
                 "openai_prompt_tokens": openai_prompt_tokens,
                 "openai_completion_tokens": openai_completion_tokens,
                 "openai_total_tokens": openai_total_tokens,
+                "slack_webhook": slack_webhook,
                 "premium_user": False
             }
         )
@@ -370,6 +371,23 @@ def askgpt_upload():
                                        version=version.__version__)
     except Exception as e:
         print(e)
+
+
+def save_webhook_url(integration_type=None, webhook_url=None):
+    print(integration_type + webhook_url)
+    if github.authorized:
+        resp = github.get("/user")
+        username = resp.json()["login"]
+        log_db(username=username, slack_webhook=webhook_url)
+    pass
+
+
+@application.route('/saveslack', methods=['POST'])
+def save_slack_key():
+    if github.authorized:
+        print(request.form['slack_webhook'])
+        save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
+    return render_template("account.html", auth=check_authorized_status(), version=version.__version__)
 
 
 if __name__ == '__main__':
