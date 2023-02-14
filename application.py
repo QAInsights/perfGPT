@@ -72,45 +72,29 @@ def index():
             resp = github.get("/user")
             username = resp.json()["login"]
             log_db(username=username)
-        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
+        return render_template("index.html", image=hero_image, auth=check_authorized_status(),
                                version=version.__version__)
 
     except Exception as e:
         username = ''
         print(e)
-        return render_template("index.html", username=username, image=hero_image, auth=check_authorized_status(),
+        return render_template("index.html", image=hero_image, auth=check_authorized_status(),
                                version=version.__version__)
 
 
-@application.errorhandler(Exception)
+@application.errorhandler(404)
 def page_not_found(error):
     try:
-        openai.api_key = os.environ['OPENAI_API_KEY']
-    except KeyError:
-        return render_template("analysis_response.html", response="API key not set.", auth=check_authorized_status(),
-                               version=version.__version__)
-    try:
         auth = check_authorized_status()
-        username = auth['username']
         if auth['logged_in']:
             auth['upload_status'] = 1
         else:
             auth['upload_status'] = 0
-        response = openai.Completion.create(
-            model=constants.model,
-            prompt=f"""
-            write a four line haiku about invalid page request
-            """,
-            temperature=constants.temperature,
-            max_tokens=constants.max_tokens,
-            top_p=constants.top_p,
-            frequency_penalty=constants.frequency_penalty,
-            presence_penalty=constants.presence_penalty
-        )
-        return render_template("invalid.html", image=invalid_image, response=response['choices'][0]['text'],
-                               username='', auth=check_authorized_status(), version=version.__version__)
+        response = "We are not there yet 🙁"
+        return render_template("invalid.html", image=invalid_image, response=response,
+                                auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
-        return render_template("invalid.html", image=invalid_image, response=e, username='',
+        return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
 
 
@@ -282,11 +266,7 @@ def askgpt_upload():
                         response = beautify_response(response['choices'][0]['text'])
 
                         responses[title] = response
-
-                        # Send Slack Notifications
-                        # send_slack_notifications(msg=response, webhook="test")
-
-                    return render_template("analysis_response.html", response=responses, username=username,
+                    return render_template("analysis_response.html", response=responses,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
