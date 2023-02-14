@@ -446,7 +446,6 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     else:
         return log_settings_db(username=get_username(), slack_webhook=webhook_url)
 
-
 @application.route('/saveslack', methods=['POST'])
 def save_slack_key():
     if github.authorized:
@@ -461,6 +460,25 @@ def save_slack_key():
                                    settings_saved="Failed",
                                    auth=check_authorized_status(),
                                    version=version.__version__)
+
+
+def get_upload_counts_all():
+    """
+    return the total upload count for all the users
+    :return: count of open_id count
+    """
+    try:
+        response = table.scan()
+        unique_openids = set()
+        for item in response['Items']:
+            unique_openids.add(item['open_id'])
+
+        return len(unique_openids)
+
+    except ClientError as e:
+        print(e)
+        return None
+
 
 
 if __name__ == '__main__':
