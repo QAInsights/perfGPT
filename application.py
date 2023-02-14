@@ -1,18 +1,14 @@
 import logging
 import os
-import re
-import json
-import boto3
 import openai
 import pandas as pd
-from botocore.exceptions import ClientError
 from flask import Flask, request, render_template
 from flask import redirect, url_for, send_from_directory
 from flask_dance.contrib.github import make_github_blueprint, github
-from boto3.dynamodb.conditions import Key, And
 from integrations.slack.slack import send_slack_notifications
 import constants
 import version
+from utils import *
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,95 +48,11 @@ application.wsgi_app = ReverseProxied(application.wsgi_app)
 application.register_blueprint(github_bp, url_prefix="/login")
 # os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-dynamodb = boto3.resource('dynamodb',
-                          aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
-                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
-                          region_name=constants.AWS_DEFAULT_REGION)
-
-table = dynamodb.Table(constants.dynamodb_table)
-settings_table = dynamodb.Table("perfgpt_dev_settings")
-
 # Images
 IMAGES_FOLDER = os.path.join('static', 'images')
 application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
 hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
-
-
-def log_settings_db(username, slack_webhook=None):
-    """
-
-    :param username:
-    :param slack_webhook:
-    :return:
-    """
-    try:
-        db_response = settings_table.put_item(
-            Item={
-                "username": username,
-                "slack_webhook": slack_webhook
-            }
-        )
-        db_status = "fail"
-        if (db_response['ResponseMetadata']['HTTPStatusCode']) == 200:
-            db_status = "success"
-            return db_status
-        else:
-            return db_status
-
-    except ClientError as e:
-        print(e)
-
-
-def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
-           openai_created=None, slack_webhook=None):
-    """
-
-    :param slack_webhook:
-    :param username:
-    :param openai_id:
-    :param openai_prompt_tokens:
-    :param openai_completion_tokens:
-    :param openai_total_tokens:
-    :param openai_created:
-    :return:
-    """
-    try:
-        db_response = table.put_item(
-            Item={
-                "username": username,
-                "inital_upload_limit": 10,
-                "datetime": str(openai_created),
-                "open_id": openai_id,
-                "openai_prompt_tokens": openai_prompt_tokens,
-                "openai_completion_tokens": openai_completion_tokens,
-                "openai_total_tokens": openai_total_tokens,
-                "slack_webhook": slack_webhook,
-                "premium_user": False
-            }
-        )
-
-    except ClientError as e:
-        print(e)
-
-
-def get_upload_count(username):
-    try:
-        response = table.query(KeyConditionExpression=Key('username').eq(username))
-        total_count = response['Count']
-        return int(total_count)
-
-    except ClientError as e:
-        print(e)
-
-
-def check_authorized_status():
-    if github.authorized:
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        return {'logged_in': True, 'username': username, 'upload_status': 1}
-    else:
-        return {'logged_in': False, 'username': None, 'upload_status': 0}
 
 
 @application.route('/favicon.ico')
@@ -290,55 +202,6 @@ def account():
                            auth=check_authorized_status(), version=version.__version__)
 
 
-def beautify_response(text):
-    """
-    :param text: the response from GPT
-    :return: beautified response
-    """
-    pattern = r'(\d+)'
-    numbers = re.finditer(pattern, text)
-    offset = 0
-    for match in numbers:
-        num = text[match.start() + offset:match.end() + offset]
-        first_half, second_half = text[:match.start() + offset], text[match.end() + offset:]
-        text = f'{first_half}<span class="fw-bold">{num}</span>{second_half}'
-        offset += 29  # number of chars added by the <span> tags
-
-    return text
-
-
-def get_username():
-    username = None
-    try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        return username
-    except Exception as e:
-        print(e)
-        return username
-
-
-def get_webhook():
-    """
-
-    :return:
-    """
-    try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
-
-        response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
-        if response['Items'][0]['slack_webhook']:
-            return response['Items'][0]['slack_webhook']
-        else:
-            return None
-        print(response)
-    except Exception as e:
-        print(e)
-
-
 @application.route('/analyze', methods=['POST'])
 def askgpt_upload():
     """
@@ -440,13 +303,6 @@ def askgpt_upload():
         print(e)
 
 
-def save_webhook_url(integration_type=None, webhook_url=None):
-    if not github.authorized:
-        return redirect(url_for("github.login"))
-    else:
-        return log_settings_db(username=get_username(), slack_webhook=webhook_url)
-
-
 @application.route('/saveslack', methods=['POST'])
 def save_slack_key():
     if github.authorized:
@@ -464,4 +320,5 @@ def save_slack_key():
 
 
 if __name__ == '__main__':
-    application.run(host='0.0.0.0', port=80, debug=True, url_scheme='https')
+    # application.run(host='0.0.0.0', port=80, debug=True, url_scheme='https')
+    application.run(host='0.0.0.0', port=80, debug=True)
