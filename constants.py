@@ -1,4 +1,4 @@
-FILE_SIZE = 100_000
+FILE_SIZE = 100_000_00
 MONTHLY_UPLOAD_LIMIT = 10
 AWS_DEFAULT_REGION = "us-east-2"
 model = "text-davinci-003"
