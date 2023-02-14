@@ -1,12 +1,9 @@
-import logging
-import os
 import openai
 import pandas as pd
 from flask import Flask, request, render_template
-from flask import redirect, url_for, send_from_directory
-from flask_dance.contrib.github import make_github_blueprint, github
-from integrations.slack.slack import send_slack_notifications
-import constants
+from flask import send_from_directory
+from flask_dance.contrib.github import make_github_blueprint
+
 import version
 from utils import *
 
@@ -27,13 +24,6 @@ class ReverseProxied(object):
 
 
 application = Flask(__name__)
-
-# For CloudWatch
-# handler = watchtower.CloudWatchLogHandler(log_group_name="perfgpt", log_stream_name="perfgpt-stream",
-#                                           region_name=constants.AWS_DEFAULT_REGION)
-# handler.formatter.add_log_record_attrs = ["levelname"]
-# logger = logging.getLogger("perfgpt")
-# logging.getLogger("perfgpt").addHandler(handler)
 
 application.secret_key = os.environ['FLASK_SECRET_KEY']
 application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
@@ -76,7 +66,6 @@ def index():
                                version=version.__version__)
 
     except Exception as e:
-        username = ''
         print(e)
         return render_template("index.html", image=hero_image, auth=check_authorized_status(),
                                version=version.__version__)
@@ -92,7 +81,7 @@ def page_not_found(error):
             auth['upload_status'] = 0
         response = "We are not there yet 🙁"
         return render_template("invalid.html", image=invalid_image, response=response,
-                                auth=check_authorized_status(), version=version.__version__)
+                               auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
         return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
@@ -300,5 +289,4 @@ def save_slack_key():
 
 
 if __name__ == '__main__':
-    # application.run(host='0.0.0.0', port=80, debug=True, url_scheme='https')
     application.run(host='0.0.0.0', port=80, debug=True)

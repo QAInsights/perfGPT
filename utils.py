@@ -17,8 +17,8 @@ dynamodb = boto3.resource('dynamodb',
                           aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
                           region_name=constants.AWS_DEFAULT_REGION)
 
-table = dynamodb.Table(constants.dynamodb_table)
-settings_table = dynamodb.Table("perfgpt_dev_settings")
+table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
+settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
 
 
 def log_settings_db(username, slack_webhook=None):
