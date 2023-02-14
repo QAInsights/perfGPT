@@ -1,7 +1,7 @@
 import requests
 
 
-def send_slack_notifications(msg):
+def send_slack_notifications(msg, webhook):
     headers = {
         'Content-type': 'application/json',
     }
@@ -11,7 +11,7 @@ def send_slack_notifications(msg):
     }
 
     response = requests.post(
-        'https://hooks.slack.com/services/{{test}}',
+        f'https://hooks.slack.com/services/{webhook}',
         headers=headers,
         json=json_data,
     )

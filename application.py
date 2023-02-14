@@ -56,7 +56,9 @@ dynamodb = boto3.resource('dynamodb',
                           aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
                           aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
                           region_name=constants.AWS_DEFAULT_REGION)
+
 table = dynamodb.Table(constants.dynamodb_table)
+settings_table = dynamodb.Table("perfgpt_dev_settings")
 
 # Images
 IMAGES_FOLDER = os.path.join('static', 'images')
@@ -65,10 +67,36 @@ hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
 
 
+def log_settings_db(username, slack_webhook=None):
+    """
+
+    :param username:
+    :param slack_webhook:
+    :return:
+    """
+    try:
+        db_response = settings_table.put_item(
+            Item={
+                "username": username,
+                "slack_webhook": slack_webhook
+            }
+        )
+        db_status = "fail"
+        if (db_response['ResponseMetadata']['HTTPStatusCode']) == 200:
+            db_status = "success"
+            return db_status
+        else:
+            return db_status
+
+    except ClientError as e:
+        print(e)
+
+
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
            openai_created=None, slack_webhook=None):
     """
 
+    :param slack_webhook:
     :param username:
     :param openai_id:
     :param openai_prompt_tokens:
@@ -253,9 +281,13 @@ def account():
     try:
         username = check_authorized_status()['username']
         get_analysis(username)
+        webhook = get_webhook()
     except Exception as e:
         print(e)
-    return render_template("account.html", auth=check_authorized_status(), version=version.__version__)
+    return render_template("account.html",
+                           webhook=webhook,
+                           settings_saved=None,
+                           auth=check_authorized_status(), version=version.__version__)
 
 
 def beautify_response(text):
@@ -273,6 +305,38 @@ def beautify_response(text):
         offset += 29  # number of chars added by the <span> tags
 
     return text
+
+
+def get_username():
+    username = None
+    try:
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+        resp = github.get("/user")
+        username = resp.json()["login"]
+        return username
+    except Exception as e:
+        print(e)
+        return username
+
+
+def get_webhook():
+    """
+
+    :return:
+    """
+    try:
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+
+        response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
+        if response['Items'][0]['slack_webhook']:
+            return response['Items'][0]['slack_webhook']
+        else:
+            return None
+        print(response)
+    except Exception as e:
+        print(e)
 
 
 @application.route('/analyze', methods=['POST'])
@@ -294,7 +358,6 @@ def askgpt_upload():
         resp = github.get("/user")
         username = resp.json()["login"]
         upload_count = get_upload_count(check_authorized_status()['username']) - 1
-        print("Upload count " + str(upload_count))
         try:
             openai.api_key = os.environ['OPENAI_API_KEY']
         except KeyError:
@@ -356,6 +419,10 @@ def askgpt_upload():
                         response = beautify_response(response['choices'][0]['text'])
 
                         responses[title] = response
+
+                        # Send Slack Notifications
+                        # send_slack_notifications(msg=response, webhook="test")
+
                     return render_template("analysis_response.html", response=responses, username=username,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
@@ -374,20 +441,26 @@ def askgpt_upload():
 
 
 def save_webhook_url(integration_type=None, webhook_url=None):
-    print(integration_type + webhook_url)
-    if github.authorized:
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        log_db(username=username, slack_webhook=webhook_url)
-    pass
+    if not github.authorized:
+        return redirect(url_for("github.login"))
+    else:
+        return log_settings_db(username=get_username(), slack_webhook=webhook_url)
 
 
 @application.route('/saveslack', methods=['POST'])
 def save_slack_key():
     if github.authorized:
-        print(request.form['slack_webhook'])
-        save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
-    return render_template("account.html", auth=check_authorized_status(), version=version.__version__)
+        settings_saved = save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
+        if settings_saved == "success":
+            return render_template("account.html",
+                                   settings_saved="Saved",
+                                   auth=check_authorized_status(),
+                                   version=version.__version__)
+        else:
+            return render_template("account.html",
+                                   settings_saved="Failed",
+                                   auth=check_authorized_status(),
+                                   version=version.__version__)
 
 
 if __name__ == '__main__':

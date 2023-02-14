@@ -21,18 +21,26 @@
   <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
       <br>
       <h4>Slack</h4>
-      <p class="lead">Follow <a href="https://api.slack.com/tutorials/tracks/getting-a-token">this instruction</a> to get a Slack webhook.</p>
-
+      <p class="lead">Follow <a href="https://api.slack.com/messaging/webhooks">this instruction</a> to get a Slack webhook.</p>
       <form class="row g-3" action="/saveslack" method="post">
           <div class="col-auto">
               <label readonly class="form-control-plaintext">https://hooks.slack.com/services/</label>
           </div>
       <div class="col-auto">
-        <input type="text" class="form-control" name="slack_webhook" placeholder="TXXXXXXXX/BYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ">
+        <input type="text" class="form-control" name="slack_webhook" pattern="^.{9}\/.{11}\/.{24}$"
+               title="Invalid webhook format"
+               placeholder="TXXXXXXXX/BYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ" value="{{ webhook }}">
       </div>
       <div class="col-auto">
         <input type="submit" class="btn btn-primary mb-3" value="Save">
       </div>
+          {% if settings_saved == "Saved" %}
+            <div class="alert alert-success" role="alert">Saved successfully.</div>
+          {% elif settings_saved == none %}
+              <div></div>
+          {% else %}
+            <div class="alert alert-danger" role="alert">Failed to save. Please try again.</div>
+          {% endif %}
     </form>
 
   </div>
