@@ -259,7 +259,9 @@ def askgpt_upload():
                         # Send Slack Notifications if enabled
                         if get_slack_notification_status() == 'true':
                             try:
-                                slack.send_slack_notifications(response['choices'][0]['text'], get_webhook())
+                                slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                                                               title=title,
+                                                               webhook=get_webhook())
                             except Exception as e:
                                 pass
 
