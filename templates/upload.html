@@ -23,7 +23,7 @@
             <span class="input-group-btn">
                 <div class="row">
                     <div class="col">
-                        <input class="form-control form-control-m" type="file" name="file">
+                        <input class="form-control form-control-m" type="file" name="file" accept=".csv,.json">
                     </div>
                     <div class="col">
                         {% if (upload_count/2)|int >= 10 %}
@@ -40,7 +40,9 @@
                     By uploading your file, you are agreeing to terms, conditions, and usage policy specified in OpenAI.
                 </span>
             </span>
+
         </form>
+
         <br>
         <div class="alert alert-primary d-flex align-items-center" role="alert">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2" viewBox="0 0 16 16" role="img" aria-label="Warning:">

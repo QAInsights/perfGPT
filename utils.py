@@ -1,14 +1,14 @@
 import logging
 import os
 import re
+
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from flask import redirect, url_for
 from flask_dance.contrib.github import github
-from boto3.dynamodb.conditions import Key
-from integrations.slack.slack import send_slack_notifications
-import constants
 
+import constants
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,9 +21,10 @@ table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
 
 
-def log_settings_db(username, slack_webhook=None):
+def log_settings_db(username, slack_webhook=None, send_notifications=None):
     """
 
+    :param send_notifications:
     :param username:
     :param slack_webhook:
     :return:
@@ -32,7 +33,8 @@ def log_settings_db(username, slack_webhook=None):
         db_response = settings_table.put_item(
             Item={
                 "username": username,
-                "slack_webhook": slack_webhook
+                "slack_webhook": slack_webhook,
+                "send_notifications": send_notifications
             }
         )
         db_status = "fail"
@@ -126,6 +128,7 @@ def beautify_response(text):
 
     return text
 
+
 def get_username():
     username = None
     try:
@@ -141,7 +144,7 @@ def get_username():
 
 def get_webhook():
     """
-
+    get the saved webhook
     :return:
     """
     try:
@@ -159,7 +162,49 @@ def get_webhook():
 
 
 def save_webhook_url(integration_type=None, webhook_url=None):
+    """
+    saves the slack webhook url
+    :param integration_type:
+    :param webhook_url:
+    :return:
+    """
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        return log_settings_db(username=get_username(), slack_webhook=webhook_url)
+        return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
+
+
+def get_upload_counts_all():
+    """
+    return the total upload count for all the users
+    :return: count of open_id count
+    """
+    try:
+        response = table.scan()
+        unique_openids = set()
+        for item in response['Items']:
+            unique_openids.add(item['open_id'])
+
+        return len(unique_openids)
+
+    except ClientError as e:
+        print(e)
+        return None
+
+
+def get_slack_notification_status():
+    """
+
+    :return:    the Slack notifications status true or false
+    """
+    try:
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+
+        response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
+        if response['Items'][0]['send_notifications']:
+            return response['Items'][0]['send_notifications']
+        else:
+            return None
+    except Exception as e:
+        print(e)

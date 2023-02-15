@@ -1,9 +1,9 @@
 import openai
 import pandas as pd
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
-
+from integrations.slack import slack
 import version
 from utils import *
 
@@ -92,7 +92,7 @@ def github_sign():
     if not github.authorized:
         return redirect(url_for("github.login"))
     else:
-        username = check_authorized_status()['username']
+        username = get_username()
         log_db(username=username)
     return redirect('/')
 
@@ -104,13 +104,17 @@ def upload():
             return redirect(url_for("github.login"))
         else:
             upload_count = get_upload_count(check_authorized_status()['username']) - 1
+            webhook = get_webhook()
+
             if upload_count == 0:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=0,
+                                       webhook=webhook,
                                        version=version.__version__)
             else:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=upload_count,
+                                       webhook=webhook,
                                        version=version.__version__)
     except Exception as e:
         print(e)
@@ -164,15 +168,17 @@ def account():
     :return:
     """
     try:
-        username = check_authorized_status()['username']
+        username = get_username()
         get_analysis(username)
         webhook = get_webhook()
+        slack_notification_status = get_slack_notification_status()
+        return render_template("account.html",
+                               webhook=webhook,
+                               settings_saved=None,
+                               slack_notification_status=slack_notification_status,
+                               auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
         print(e)
-    return render_template("account.html",
-                           webhook=webhook,
-                           settings_saved=None,
-                           auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/analyze', methods=['POST'])
@@ -218,7 +224,8 @@ def askgpt_upload():
                         contents = pd.read_json(file)
                 except Exception as e:
                     return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
-                                                                              "the file is not empty and is in one of the"
+                                                                              "the file is not empty and is in one of "
+                                                                              "the"
                                                                               " supported formats.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
@@ -243,18 +250,25 @@ def askgpt_upload():
                             frequency_penalty=constants.frequency_penalty,
                             presence_penalty=constants.presence_penalty
                         )
-                        # print(response)
-                        # logger.info({"username": f"{username} uploaded data"})
-
                         log_db(username=username, openai_id=response['id'],
                                openai_prompt_tokens=response['usage']['prompt_tokens'],
                                openai_completion_tokens=response['usage']['completion_tokens'],
                                openai_total_tokens=response['usage']['total_tokens'],
                                openai_created=response['created'])
 
+                        # Send Slack Notifications if enabled
+                        if get_slack_notification_status() == 'true':
+                            try:
+                                slack.send_slack_notifications(response['choices'][0]['text'], get_webhook())
+                            except Exception as e:
+                                pass
+
                         response = beautify_response(response['choices'][0]['text'])
 
                         responses[title] = response
+
+
+
                     return render_template("analysis_response.html", response=responses,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
@@ -286,6 +300,14 @@ def save_slack_key():
                                    settings_saved="Failed",
                                    auth=check_authorized_status(),
                                    version=version.__version__)
+
+
+@application.route('/sendslacknotifications', methods=['POST'])
+def save_slack_notifications():
+    if github.authorized:
+        status = request.form['status']
+        log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
+        return "Done"
 
 
 if __name__ == '__main__':
