@@ -1,3 +1,4 @@
+from urllib import response
 import openai
 import pandas as pd
 from flask import Flask, request, render_template, jsonify
@@ -107,7 +108,11 @@ def upload():
         if not github.authorized:
             return redirect(url_for("github.login"))
         else:
-            upload_count = get_upload_count(check_authorized_status()['username']) - 1
+            upload_count = get_upload_count(check_authorized_status()['username'])
+            if upload_count:
+                upload_count -= 1
+            else:
+                upload_count = 0
             webhook = get_webhook()
 
             if upload_count == 0:
@@ -122,6 +127,8 @@ def upload():
                                        version=version.__version__)
     except Exception as e:
         print(e)
+        return render_template("invalid.html", image=invalid_image, response=e,
+                               auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/about')
@@ -183,6 +190,8 @@ def account():
                                auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
         print(e)
+        return render_template("invalid.html", image=invalid_image, response=e,
+                               auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/analyze', methods=['POST'])
@@ -290,6 +299,8 @@ def askgpt_upload():
                                        version=version.__version__)
     except Exception as e:
         print(e)
+        return render_template("invalid.html", image=invalid_image, response=e,
+                               auth=check_authorized_status(), version=version.__version__)
 
 
 @application.route('/saveslack', methods=['POST'])
