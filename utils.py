@@ -88,8 +88,10 @@ def get_upload_count(username):
     :return:            returns the upload count of the user
     """
     try:
+        total_count = 0
         response = table.query(KeyConditionExpression=Key('username').eq(username))
-        total_count = response['Count']
+        if response:
+            total_count = response['Count']
         return int(total_count)
 
     except ClientError as e:
@@ -146,8 +148,6 @@ def get_username():
     """
     username = None
     try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
         resp = github.get("/user")
         username = resp.json()["login"]
         return username
@@ -162,9 +162,6 @@ def get_webhook():
     :return:
     """
     try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
-
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
         if response['Items'][0]['slack_webhook']:
             return response['Items'][0]['slack_webhook']
@@ -182,10 +179,8 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     :param webhook_url:
     :return:
     """
-    if not github.authorized:
-        return redirect(url_for("github.login"))
-    else:
-        return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
+    return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
+
 
 def get_total_users_count():
     """
@@ -252,9 +247,6 @@ def get_slack_notification_status():
     :return:    the Slack notifications status true or false
     """
     try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
-
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
         if response['Items'][0]['send_notifications']:
             return response['Items'][0]['send_notifications']

@@ -23,6 +23,15 @@ class ReverseProxied(object):
             environ["wsgi.url_scheme"] = "https"
         return self.app(environ, start_response)
 
+# Authentication middleware
+def login_required(func):
+    def wrapper(*args, **kwargs):
+        if not github.authorized:
+            return redirect(url_for("github.login"))
+        return func(*args, **kwargs)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
 
 application = Flask(__name__)
 
@@ -60,8 +69,7 @@ def index():
     """
     try:
         if github.authorized:
-            resp = github.get("/user")
-            username = resp.json()["login"]
+            username = get_username()
             log_db(username=username)
 
         return render_template("index.html", image=hero_image,
@@ -93,38 +101,30 @@ def page_not_found(error):
 
 
 @application.route('/signin')
+@login_required
 def github_sign():
-    if not github.authorized:
-        return redirect(url_for("github.login"))
-    else:
-        username = get_username()
-        log_db(username=username)
+    username = get_username()
+    log_db(username=username)
     return redirect('/')
 
 
 @application.route('/upload')
+@login_required
 def upload():
     try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
-        else:
-            upload_count = get_upload_count(check_authorized_status()['username'])
-            if upload_count:
-                upload_count -= 1
-            else:
-                upload_count = 0
-            webhook = get_webhook()
+        upload_count = get_upload_count(check_authorized_status()['username']) - 1
+        webhook = get_webhook()
 
-            if upload_count == 0:
-                return render_template('upload.html', auth=check_authorized_status(),
-                                       upload_count=0,
-                                       webhook=webhook,
-                                       version=version.__version__)
-            else:
-                return render_template('upload.html', auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       webhook=webhook,
-                                       version=version.__version__)
+        if upload_count == 0:
+            return render_template('upload.html', auth=check_authorized_status(),
+                                    upload_count=0,
+                                    webhook=webhook,
+                                    version=version.__version__)
+        else:
+            return render_template('upload.html', auth=check_authorized_status(),
+                                    upload_count=upload_count,
+                                    webhook=webhook,
+                                    version=version.__version__)
     except Exception as e:
         print(e)
         return render_template("invalid.html", image=invalid_image, response=e,
@@ -159,20 +159,8 @@ def help_page():
     return render_template("help.html", auth=check_authorized_status(), version=version.__version__)
 
 
-def get_analysis(username):
-    # response = table.query(KeyConditionExpression=Key('username').eq(username))
-    # total_count = response['Count']
-    # print(json.dumps(response['Items']))
-    # for i, j in json.dumps(response['Items']).items():
-    # print(i, j)
-    # pass
-
-    # for k,v in response.items():
-    #     print(k, type(k), v, type(v))
-    pass
-
-
 @application.route('/account')
+@login_required
 def account():
     """
 
@@ -195,6 +183,7 @@ def account():
 
 
 @application.route('/analyze', methods=['POST'])
+@login_required
 def askgpt_upload():
     """
     ask GPT
@@ -208,8 +197,6 @@ def askgpt_upload():
                             "results."
     }
     try:
-        if not github.authorized:
-            return redirect(url_for("github.login"))
         resp = github.get("/user")
         username = resp.json()["login"]
         upload_count = get_upload_count(check_authorized_status()['username']) - 1
@@ -304,27 +291,27 @@ def askgpt_upload():
 
 
 @application.route('/saveslack', methods=['POST'])
+@login_required
 def save_slack_key():
-    if github.authorized:
-        settings_saved = save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
-        if settings_saved == "success":
-            return render_template("account.html",
-                                   settings_saved="Saved",
-                                   auth=check_authorized_status(),
-                                   version=version.__version__)
-        else:
-            return render_template("account.html",
-                                   settings_saved="Failed",
-                                   auth=check_authorized_status(),
-                                   version=version.__version__)
+    settings_saved = save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
+    if settings_saved == "success":
+        return render_template("account.html",
+                                settings_saved="Saved",
+                                auth=check_authorized_status(),
+                                version=version.__version__)
+    else:
+        return render_template("account.html",
+                                settings_saved="Failed",
+                                auth=check_authorized_status(),
+                                version=version.__version__)
 
 
 @application.route('/sendslacknotifications', methods=['POST'])
+@login_required
 def save_slack_notifications():
-    if github.authorized:
-        status = request.form['status']
-        log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
-        return "Done"
+    status = request.form['status']
+    log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
+    return "Done"
 
 
 if __name__ == '__main__':
