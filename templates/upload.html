@@ -23,7 +23,7 @@
             <span class="input-group-btn">
                 <div class="row">
                     <div class="col">
-                        <input class="form-control form-control-m" type="file" name="file" accept=".csv,.json">
+                        <input class="form-control form-control-m" type="file" name="file" accept=".csv,.json,.jtl">
                     </div>
                     <div class="col">
                         {% if (upload_count/2)|int >= 10 %}
@@ -33,7 +33,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <span class="fw-light">Supported file types: csv, json | Try with this</span><span class="fw-light">
+                <span class="fw-light">Supported file types: csv, jtl, or json | Try with this</span><span class="fw-light">
                 <a href="https://github.com/QAInsights/perfGPT/blob/fea38951b1eb0c1ce2afc1b3d5ed3d1bd74f0536/run.csv"
                 target="_blank">sample data</a>.</span><br>
                 <span class="fw-light">

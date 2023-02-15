@@ -218,7 +218,7 @@ def askgpt_upload():
             if request.files:
                 file = request.files['file']
                 try:
-                    if file.filename.endswith('.csv'):
+                    if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
                         contents = pd.read_csv(file)
                     if file.filename.endswith('.json'):
                         contents = pd.read_json(file)
