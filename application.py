@@ -62,7 +62,11 @@ def index():
             resp = github.get("/user")
             username = resp.json()["login"]
             log_db(username=username)
-        return render_template("index.html", image=hero_image, auth=check_authorized_status(),
+
+        return render_template("index.html", image=hero_image,
+                               total_tokens=get_total_tokens_all(),
+                               total_users=get_total_users_count(),
+                               auth=check_authorized_status(),
                                version=version.__version__)
 
     except Exception as e:

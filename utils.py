@@ -9,6 +9,7 @@ from flask import redirect, url_for
 from flask_dance.contrib.github import github
 
 import constants
+from decimal import Decimal
 
 logging.basicConfig(level=logging.INFO)
 
@@ -81,6 +82,11 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
 
 
 def get_upload_count(username):
+    """
+
+    :param username:    username
+    :return:            returns the upload count of the user
+    """
     try:
         response = table.query(KeyConditionExpression=Key('username').eq(username))
         total_count = response['Count']
@@ -91,6 +97,10 @@ def get_upload_count(username):
 
 
 def check_authorized_status():
+    """
+
+    :return:    checks the authorized status, then returns boolean
+    """
     if github.authorized:
         resp = github.get("/user")
         username = resp.json()["login"]
@@ -130,6 +140,10 @@ def beautify_response(text):
 
 
 def get_username():
+    """
+
+    :return:    return the username if logged in
+    """
     username = None
     try:
         if not github.authorized:
@@ -173,11 +187,27 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     else:
         return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
 
+def get_total_users_count():
+    """
+
+    :return:    total users count
+    """
+    try:
+        response = table.scan()
+        print(response['Items'])
+        users = set()
+        for item in response['Items']:
+            users.add(item['username'])
+        return len(users)
+
+    except ClientError as e:
+        print(e)
+        return None
 
 def get_upload_counts_all():
     """
     return the total upload count for all the users
-    :return: count of open_id count
+    :return:    count of open_id count
     """
     try:
         response = table.scan()
@@ -186,6 +216,30 @@ def get_upload_counts_all():
             unique_openids.add(item['open_id'])
 
         return len(unique_openids)
+
+    except ClientError as e:
+        print(e)
+        return None
+
+
+def get_total_tokens_all():
+    """
+
+    :return:    count of all the tokens from all the users
+    """
+    try:
+        response = table.scan()
+        print(response)
+        openai_total_tokens = set()
+        for item in response['Items']:
+            openai_total_tokens.add(item['openai_total_tokens'])
+
+        total_tokens = Decimal('0')
+        for item in openai_total_tokens:
+            if item is not None:
+                total_tokens += item
+
+        return total_tokens
 
     except ClientError as e:
         print(e)
