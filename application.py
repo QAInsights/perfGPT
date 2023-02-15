@@ -7,6 +7,7 @@ from flask_dance.contrib.github import make_github_blueprint
 from integrations.slack import slack
 import version
 from utils import *
+from analytics import *
 
 logging.basicConfig(level=logging.INFO)
 
@@ -73,8 +74,9 @@ def index():
             log_db(username=username)
 
         return render_template("index.html", image=hero_image,
-                               total_tokens=get_total_tokens_all(),
-                               total_users=get_total_users_count(),
+                               total_tokens=total_tokens,
+                               total_users=total_users,
+                               total_uploads=total_uploads,
                                auth=check_authorized_status(),
                                version=version.__version__)
 
@@ -260,6 +262,7 @@ def askgpt_upload():
                         if get_slack_notification_status() == 'true':
                             try:
                                 slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                                                               filename=file.filename,
                                                                title=title,
                                                                webhook=get_webhook())
                             except Exception as e:

@@ -21,14 +21,22 @@
                         <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/signin')"><i class="fab fa-github"></i> Login using GitHub</button>
                     </div>
                 </div>
-            <h2>
-              {{ total_tokens }}
-              <small class="text-muted">Total tokens consumed</small>
-            </h2>
-            <h2>
-              {{ total_users }}
-              <small class="text-muted">Users signed</small>
-            </h2>
+            <div class="container">
+              <div class="row">
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_tokens }}+</h3>
+                  <p class="lead"><i class="fas fa-coins"></i> Tokens</p>
+                </div>
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_users }}+</h3>
+                  <p class="lead"><i class="fas fa-users"></i> Users</p>
+                </div>
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_uploads }}+</h3>
+                  <p class="lead"><i class="fas fa-upload"></i> Uploads</p>
+                </div>
+              </div>
+            </div>
             <br>
                 <div class="alert alert-info" role="alert">
                     <p>Become a world-class Java performance expert. Check out this <a href="https://ycrash.io/java-performance-training?ref=perfgpt" target="_blank">training</a> course.</p>
@@ -42,6 +50,5 @@
         </div>
     </div>
 </div>
-
 
 {% endblock %}

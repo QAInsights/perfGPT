@@ -1,11 +1,19 @@
 import requests
 import json
+import datetime
 
-
-def send_slack_notifications(msg, webhook, title):
+def send_slack_notifications(msg, webhook, title, filename):
     emoji = False
 
     blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"PerfGPT analysis for {filename} at {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC",
+                    "emoji": emoji
+                }
+            },
             {
                 "type": "header",
                 "text": {
