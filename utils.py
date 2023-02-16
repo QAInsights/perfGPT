@@ -1,3 +1,4 @@
+from calendar import day_abbr
 import logging
 import os
 import re
@@ -17,8 +18,10 @@ logging.basicConfig(level=logging.INFO)
 
 sts_client = boto3.client('sts')
 credentials = Sts()
+dynamodb = None
 
 def refresh_credentials():
+    global dynamodb
     response = sts_client.assume_role(RoleArn='arn:aws:iam::123456789012:role/MyRole',
                                       RoleSessionName='my_session')
     access_key_id = response['Credentials']['AccessKeyId']
@@ -26,8 +29,7 @@ def refresh_credentials():
     session_token = response['Credentials']['SessionToken']
 
     credentials.set_credentials(access_key_id, secret_access_key, session_token)
-
-refresh_credentials()
+    dynamodb = init_dynamodb()
 
 def init_dynamodb():
     dynamodb = boto3.resource('dynamodb',
@@ -37,7 +39,7 @@ def init_dynamodb():
                           region_name=constants.AWS_DEFAULT_REGION)
     return dynamodb
 
-dynamodb = init_dynamodb()
+refresh_credentials()
 
 table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
