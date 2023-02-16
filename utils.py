@@ -9,15 +9,35 @@ from flask import redirect, url_for
 from flask_dance.contrib.github import github
 
 import constants
+from secrets import Sts
 from decimal import Decimal
 import json
 
 logging.basicConfig(level=logging.INFO)
 
-dynamodb = boto3.resource('dynamodb',
-                          aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET'],
-                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
+sts_client = boto3.client('sts')
+credentials = Sts()
+
+def refresh_credentials():
+    response = sts_client.assume_role(RoleArn='arn:aws:iam::123456789012:role/MyRole',
+                                      RoleSessionName='my_session')
+    access_key_id = response['Credentials']['AccessKeyId']
+    secret_access_key = response['Credentials']['SecretAccessKey']
+    session_token = response['Credentials']['SessionToken']
+
+    credentials.set_credentials(access_key_id, secret_access_key, session_token)
+
+refresh_credentials()
+
+def init_dynamodb():
+    dynamodb = boto3.resource('dynamodb',
+                          aws_secret_access_key=credentials.aws_access_key_id,
+                          aws_access_key_id=credentials.aws_secret_access_key,
+                          aws_session_token=credentials.aws_session_token,
                           region_name=constants.AWS_DEFAULT_REGION)
+    return dynamodb
+
+dynamodb = init_dynamodb()
 
 table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
@@ -46,7 +66,9 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None):
             return db_status
         else:
             return db_status
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
 
@@ -78,7 +100,9 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
                 "premium_user": False
             }
         )
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
 
@@ -95,7 +119,9 @@ def get_upload_count(username):
         if response:
             total_count = response['Count']
         return int(total_count)
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
 
@@ -170,6 +196,9 @@ def get_webhook():
         else:
             return None
         print(response)
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except Exception as e:
         print(e)
 
@@ -195,7 +224,9 @@ def get_total_users_count():
         for item in response['Items']:
             users.add(item['username'])
         return len(users)
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
         return None
@@ -213,7 +244,9 @@ def get_upload_counts_all():
             unique_openids.add(item['open_id'])
 
         return len(unique_openids)
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
         return None
@@ -236,7 +269,9 @@ def get_total_tokens_all():
                 total_tokens += item
 
         return total_tokens
-
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except ClientError as e:
         print(e)
         return None
@@ -253,6 +288,9 @@ def get_slack_notification_status():
             return response['Items'][0]['send_notifications']
         else:
             return None
+    except dynamodb.exceptions.ExpiredTokenException:
+        refresh_credentials()
+        dynamodb = init_dynamodb()
     except Exception as e:
         print(e)
 

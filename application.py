@@ -7,6 +7,9 @@ from flask_dance.contrib.github import make_github_blueprint
 from integrations.slack import slack
 import version
 from utils import *
+from analytics import *
+import schedule
+import time
 
 logging.basicConfig(level=logging.INFO)
 
@@ -319,3 +322,8 @@ def save_slack_notifications():
 
 if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
+    # STS credentials expire after 1 hour, so refresh every 50 minutes
+    schedule.every(50).minutes.do(refresh_credentials)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
