@@ -26,12 +26,14 @@ class ReverseProxied(object):
             environ["wsgi.url_scheme"] = "https"
         return self.app(environ, start_response)
 
+
 # Authentication middleware
 def login_required(func):
     def wrapper(*args, **kwargs):
         if not github.authorized:
             return redirect(url_for("github.login"))
         return func(*args, **kwargs)
+
     wrapper.__name__ = func.__name__
     return wrapper
 
@@ -56,6 +58,7 @@ IMAGES_FOLDER = os.path.join('static', 'images')
 application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
 hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
+
 
 @application.route('/favicon.ico')
 def favicon():
@@ -122,14 +125,14 @@ def upload():
 
         if upload_count == 0:
             return render_template('upload.html', auth=check_authorized_status(),
-                                    upload_count=0,
-                                    webhook=webhook,
-                                    version=version.__version__)
+                                   upload_count=0,
+                                   webhook=webhook,
+                                   version=version.__version__)
         else:
             return render_template('upload.html', auth=check_authorized_status(),
-                                    upload_count=upload_count,
-                                    webhook=webhook,
-                                    version=version.__version__)
+                                   upload_count=upload_count,
+                                   webhook=webhook,
+                                   version=version.__version__)
     except Exception as e:
         print(e)
         return render_template("invalid.html", image=invalid_image, response=e,
@@ -275,8 +278,6 @@ def askgpt_upload():
 
                         responses[title] = response
 
-
-
                     return render_template("analysis_response.html", response=responses,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
@@ -302,14 +303,14 @@ def save_slack_key():
     settings_saved = save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
     if settings_saved == "success":
         return render_template("account.html",
-                                settings_saved="Saved",
-                                auth=check_authorized_status(),
-                                version=version.__version__)
+                               settings_saved="Saved",
+                               auth=check_authorized_status(),
+                               version=version.__version__)
     else:
         return render_template("account.html",
-                                settings_saved="Failed",
-                                auth=check_authorized_status(),
-                                version=version.__version__)
+                               settings_saved="Failed",
+                               auth=check_authorized_status(),
+                               version=version.__version__)
 
 
 @application.route('/sendslacknotifications', methods=['POST'])

@@ -9,35 +9,40 @@ from botocore.exceptions import ClientError
 from flask import redirect, url_for
 from flask_dance.contrib.github import github
 
+
 import constants
-from secrets import Sts
+from secrets_client import Sts
+
 from decimal import Decimal
 import json
 
 logging.basicConfig(level=logging.INFO)
 
-sts_client = boto3.client('sts')
+sts_client = boto3.client('sts', region_name=constants.AWS_DEFAULT_REGION)
 credentials = Sts()
+
 dynamodb = None
+
 
 def refresh_credentials():
     global dynamodb
-    response = sts_client.assume_role(RoleArn='arn:aws:iam::123456789012:role/MyRole',
+    response = sts_client.assume_role(RoleArn=os.environ['ARN'],
                                       RoleSessionName='my_session')
     access_key_id = response['Credentials']['AccessKeyId']
     secret_access_key = response['Credentials']['SecretAccessKey']
     session_token = response['Credentials']['SessionToken']
-
     credentials.set_credentials(access_key_id, secret_access_key, session_token)
     dynamodb = init_dynamodb()
 
+
 def init_dynamodb():
     dynamodb = boto3.resource('dynamodb',
-                          aws_secret_access_key=credentials.aws_access_key_id,
-                          aws_access_key_id=credentials.aws_secret_access_key,
-                          aws_session_token=credentials.aws_session_token,
-                          region_name=constants.AWS_DEFAULT_REGION)
+                              aws_secret_access_key=credentials.aws_access_key_id,
+                              aws_access_key_id=credentials.aws_secret_access_key,
+                              aws_session_token=credentials.aws_session_token,
+                              region_name=constants.AWS_DEFAULT_REGION)
     return dynamodb
+
 
 refresh_credentials()
 
@@ -46,7 +51,7 @@ settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
 get_analytics_url = os.environ['AWS_GATEWAY_URL']
 
 
-def log_settings_db(username, slack_webhook=None, send_notifications=None):
+def log_settings_db(username, slack_webhook=None, send_notifications=None, dynamodb=None):
     """
 
     :param send_notifications:
@@ -68,6 +73,7 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None):
             return db_status
         else:
             return db_status
+        
     except dynamodb.exceptions.ExpiredTokenException:
         refresh_credentials()
         dynamodb = init_dynamodb()
@@ -76,7 +82,7 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None):
 
 
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
-           openai_created=None, slack_webhook=None):
+           openai_created=None, slack_webhook=None, dynamodb=None):
     """
 
     :param slack_webhook:
@@ -109,7 +115,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
         print(e)
 
 
-def get_upload_count(username):
+def get_upload_count(username, dynamodb=None):
     """
 
     :param username:    username
@@ -215,7 +221,7 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
 
 
-def get_total_users_count():
+def get_total_users_count(dynamodb=None):
     """
 
     :return:    total users count
@@ -234,7 +240,7 @@ def get_total_users_count():
         return None
 
 
-def get_upload_counts_all():
+def get_upload_counts_all(dynamodb=None):
     """
     return the total upload count for all the users
     :return:    count of open_id count
@@ -254,7 +260,7 @@ def get_upload_counts_all():
         return None
 
 
-def get_total_tokens_all():
+def get_total_tokens_all(dynamodb=None):
     """
 
     :return:    count of all the tokens from all the users
@@ -279,7 +285,7 @@ def get_total_tokens_all():
         return None
 
 
-def get_slack_notification_status():
+def get_slack_notification_status(dynamodb=None):
     """
 
     :return:    the Slack notifications status true or false
@@ -304,4 +310,3 @@ def get_analytics_data():
     """
     get_analytics = requests.get(get_analytics_url).text
     return json.loads(get_analytics)
-
