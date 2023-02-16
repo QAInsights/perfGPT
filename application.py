@@ -7,7 +7,6 @@ from flask_dance.contrib.github import make_github_blueprint
 from integrations.slack import slack
 import version
 from utils import *
-from analytics import *
 
 logging.basicConfig(level=logging.INFO)
 
@@ -55,7 +54,6 @@ application.config['UPLOAD_FOLDER'] = IMAGES_FOLDER
 hero_image = os.path.join(application.config['UPLOAD_FOLDER'], 'perfgpt.png')
 invalid_image = os.path.join(application.config['UPLOAD_FOLDER'], 'robot-found-a-invalid-page.png')
 
-
 @application.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(application.root_path, 'static'),
@@ -73,10 +71,12 @@ def index():
             username = get_username()
             log_db(username=username)
 
+        get_analytics_response = get_analytics_data()
+
         return render_template("index.html", image=hero_image,
-                               total_tokens=total_tokens,
-                               total_users=total_users,
-                               total_uploads=total_uploads,
+                               total_tokens=get_analytics_response['total_tokens'],
+                               total_users=get_analytics_response['total_users'],
+                               total_uploads=get_analytics_response['total_uploads'],
                                auth=check_authorized_status(),
                                version=version.__version__)
 

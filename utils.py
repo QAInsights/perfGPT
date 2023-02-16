@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-
+import requests
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
@@ -10,6 +10,7 @@ from flask_dance.contrib.github import github
 
 import constants
 from decimal import Decimal
+import json
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,6 +21,7 @@ dynamodb = boto3.resource('dynamodb',
 
 table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
+get_analytics_url = os.environ['AWS_GATEWAY_URL']
 
 
 def log_settings_db(username, slack_webhook=None, send_notifications=None):
@@ -189,7 +191,6 @@ def get_total_users_count():
     """
     try:
         response = table.scan()
-        print(response['Items'])
         users = set()
         for item in response['Items']:
             users.add(item['username'])
@@ -198,6 +199,7 @@ def get_total_users_count():
     except ClientError as e:
         print(e)
         return None
+
 
 def get_upload_counts_all():
     """
@@ -224,7 +226,6 @@ def get_total_tokens_all():
     """
     try:
         response = table.scan()
-        print(response)
         openai_total_tokens = set()
         for item in response['Items']:
             openai_total_tokens.add(item['openai_total_tokens'])
@@ -254,3 +255,13 @@ def get_slack_notification_status():
             return None
     except Exception as e:
         print(e)
+
+
+def get_analytics_data():
+    """
+
+    :return:    get analytics data from dynamodb
+    """
+    get_analytics = requests.get(get_analytics_url).text
+    return json.loads(get_analytics)
+
