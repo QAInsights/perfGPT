@@ -1,21 +1,19 @@
+import json
 import logging
 import os
 import re
-import requests
+from decimal import Decimal
+
 import boto3
+import requests
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
-from flask import redirect, url_for
+from dotenv import load_dotenv
 from flask_dance.contrib.github import github
 
 import constants
 import secrets_client
 from secrets_client import Sts
-
-from decimal import Decimal
-import json
-from dotenv import load_dotenv
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,6 +26,7 @@ credentials = Sts()
 
 dynamodb = None
 
+
 def load_env_vars(application):
     load_dotenv()
     _vars = {}
@@ -35,12 +34,23 @@ def load_env_vars(application):
         application.secret_key = os.environ['FLASK_SECRET_KEY']
         application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
         application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+        _vars['MIXPANEL_US'] = os.environ['MIXPANEL_US']
         _vars['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
+
     elif os.getenv('FLASK_ENV') == "prod":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
-        application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID', constants.AWS_DEFAULT_REGION, credentials)
-        application.config["GITHUB_OAUTH_CLIENT_SECRET"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_SECRET', constants.AWS_DEFAULT_REGION, credentials)
-        _vars['OPENAI_API_KEY'] = secrets_client.get_secret('OPENAI_API_KEY', constants.AWS_DEFAULT_REGION, credentials)
+        application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID',
+                                                                                 constants.AWS_DEFAULT_REGION,
+                                                                                 credentials)
+        application.config["GITHUB_OAUTH_CLIENT_SECRET"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_SECRET',
+                                                                                     constants.AWS_DEFAULT_REGION,
+                                                                                     credentials)
+        _vars['MIXPANEL_US'] = secrets_client.get_secret('MIXPANEL_US',
+                                                         constants.AWS_DEFAULT_REGION,
+                                                         credentials)
+        _vars['OPENAI_API_KEY'] = secrets_client.get_secret('OPENAI_API_KEY',
+                                                            constants.AWS_DEFAULT_REGION,
+                                                            credentials)
 
     else:
         print("No environment exists.")
@@ -56,7 +66,7 @@ def refresh_credentials():
         secret_access_key = response['Credentials']['SecretAccessKey']
         session_token = response['Credentials']['SessionToken']
         credentials.set_credentials(access_key_id, secret_access_key, session_token)
-        
+
     except Exception as e:
         print(e)
 
@@ -77,6 +87,7 @@ def re_init():
     global dynamodb
     refresh_credentials()
     dynamodb = init_dynamodb()
+
 
 re_init()
 
@@ -333,4 +344,5 @@ def get_analytics_data():
     :return:    get analytics data from dynamodb
     """
     get_analytics = requests.get(get_analytics_url).text
+
     return json.loads(get_analytics)

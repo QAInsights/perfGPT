@@ -2,6 +2,8 @@ import boto3
 from botocore.exceptions import ClientError
 import json
 
+import constants
+
 
 class Sts:
     def __init__(self) -> None:
@@ -57,3 +59,4 @@ def get_secret(secret_name, region_name, credentials):
     secret = json.loads(get_secret_value_response['SecretString'])
 
     return secret[secret_name]
+

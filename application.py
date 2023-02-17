@@ -1,7 +1,7 @@
 from urllib import response
 import openai
 import pandas as pd
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, redirect, url_for
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
 
@@ -11,6 +11,7 @@ from utils import *
 from analytics import *
 import schedule
 import time
+from mixpanel import Mixpanel
 
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +46,7 @@ application = Flask(__name__)
 # Load all env variables
 _vars = load_env_vars(application)
 
+mp = Mixpanel(_vars['MIXPANEL_US'])
 github_bp = make_github_blueprint()
 
 application.config.update(dict(PREFERRED_URL_SCHEME='https'))
@@ -112,6 +114,8 @@ def page_not_found(error):
 def github_sign():
     username = get_username()
     log_db(username=username)
+    mp.track(username, 'User signed up')
+
     return redirect('/')
 
 
@@ -119,6 +123,8 @@ def github_sign():
 @login_required
 def upload():
     try:
+        mp.track(get_username(), 'Users in Upload page')
+
         upload_count = get_upload_count(get_username()) - 1
         webhook = get_webhook()
 
@@ -178,6 +184,8 @@ def account():
         get_analysis(username)
         webhook = get_webhook()
         slack_notification_status = get_slack_notification_status()
+
+        mp.track(username, "Users in Settings page")
         return render_template("account.html",
                                webhook=webhook,
                                settings_saved=None,
