@@ -54,7 +54,8 @@ def get_secret(secret_name, region_name):
             'secretsmanager',
             aws_access_key_id=access_key_id,
             aws_secret_access_key=secret_access_key,
-            aws_session_token=session_token)
+            aws_session_token=session_token,
+            region_name=region_name)
 
         get_secret_value_response = secrets_client.get_secret_value(
             SecretId=secret_name
