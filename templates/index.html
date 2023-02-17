@@ -21,18 +21,36 @@
                         <button type="button" class="btn btn-primary btn-lg px-4 me-sm-3" onclick="window.open('/signin')"><i class="fab fa-github"></i> Login using GitHub</button>
                     </div>
                 </div>
-                <div class="alert alert-info" role="alert">
-                    <p>Become a world-class Java performance expert. Check out this <a href="https://ycrash.io/java-performance-training?ref=perfgpt" target="_blank">training</a> course.</p>
+            <div class="container">
+              <div class="row">
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_tokens }}+</h3>
+                  <p class="lead"><i class="fas fa-coins"></i> Tokens</p>
+                </div>
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_users }}+</h3>
+                  <p class="lead"><i class="fas fa-users"></i> Users</p>
+                </div>
+                <div class="col text-center">
+                  <h3 class="typed-text">{{ total_uploads }}+</h3>
+                  <p class="lead"><i class="fas fa-upload"></i> Uploads</p>
+                </div>
+              </div>
+            </div>
+            <br>
+                <div class="alert alert-info alert-dismissible" role="alert">
+                    <div><i class="fas fa-user-graduate"></i> Become a world-class Java performance expert. Check out this <a href="https://ycrash.io/java-performance-training?ref=perfgpt" target="_blank">training</a> course.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
                 </div>
               {% endif %}
-            <div class="overflow-hidden" style="max-height: 30vh;">
+            <div class="overflow-hidden">
               <div class="container px-5">
-                <img src="{{ image }}" class="img-fluid border rounded-3 shadow-lg mb-4" width="700" height="500" alt="PerfGPT" loading="lazy">
+                <img src="{{ image }}" class="img-fluid border rounded-3 shadow mb-4" width="500" height="300" alt="PerfGPT" loading="lazy">
               </div>
             </div>
         </div>
     </div>
 </div>
-
 
 {% endblock %}
