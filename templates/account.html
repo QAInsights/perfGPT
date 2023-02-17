@@ -8,40 +8,40 @@
     <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button" role="tab" aria-controls="home-tab-pane" aria-selected="true">Integrations</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">Uploads</button>
+    <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#uploads-tab-pane" type="button" role="tab" aria-controls="uploads-tab-pane" aria-selected="false">Uploads</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact-tab-pane" type="button" role="tab" aria-controls="contact-tab-pane" aria-selected="false">Billing</button>
+    <button class="nav-link" id="billing-tab" data-bs-toggle="tab" data-bs-target="#billing-tab-pane" type="button" role="tab" aria-controls="billing-tab-pane" aria-selected="false">Billing</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="disabled-tab" data-bs-toggle="tab" data-bs-target="#disabled-tab-pane" type="button" role="tab" aria-controls="disabled-tab-pane" aria-selected="false" disabled>Support</button>
+    <button class="nav-link" id="support-tab" data-bs-toggle="tab" data-bs-target="#support-tab-pane" type="button" role="tab" aria-controls="support-tab-pane" aria-selected="false">Support</button>
   </li>
 </ul>
 <div class="tab-content" id="myTabContent">
   <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
       <br>
-      <h4>Slack</h4>
+      <h4><i class="fab fa-slack"></i> Slack</h4>
       <p class="lead">Follow <a href="https://api.slack.com/messaging/webhooks">this instruction</a> to get a Slack webhook.</p>
       <form class="row g-3" action="/saveslack" method="post">
+              <div class="col-auto">
+                  <label readonly class="form-control-plaintext">https://hooks.slack.com/services/</label>
+              </div>
           <div class="col-auto">
-              <label readonly class="form-control-plaintext">https://hooks.slack.com/services/</label>
+            <input type="text" class="form-control" name="slack_webhook" pattern="^.{9}\/.{11}\/.{24}$"
+                   title="Invalid webhook format"
+                   placeholder="TXXXXXXXX/BYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ" value="{{ webhook }}">
           </div>
-      <div class="col-auto">
-        <input type="text" class="form-control" name="slack_webhook" pattern="^.{9}\/.{11}\/.{24}$"
-               title="Invalid webhook format"
-               placeholder="TXXXXXXXX/BYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ" value="{{ webhook }}">
-      </div>
-      <div class="col-auto">
-        <input type="submit" class="btn btn-primary mb-3" value="Save">
-      </div>
-          {% if settings_saved == "Saved" %}
-            <div class="alert alert-success" role="alert">Saved successfully.</div>
-          {% elif settings_saved == none %}
-              <div></div>
-          {% else %}
-            <div class="alert alert-danger" role="alert">Failed to save. Please try again.</div>
-          {% endif %}
-    </form>
+          <div class="col-auto">
+            <input type="submit" class="btn btn-primary mb-3" value="Save">
+          </div>
+              {% if settings_saved == "Saved" %}
+                <div class="alert alert-success" role="alert">Saved successfully.</div>
+              {% elif settings_saved == none %}
+                  <div></div>
+              {% else %}
+                <div class="alert alert-danger" role="alert">Failed to save. Please try again.</div>
+              {% endif %}
+        </form>
         {% if webhook %}
         <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault" {% if slack_notification_status %} checked {% endif %}>
@@ -49,8 +49,33 @@
         </div>
         {% endif %}
 
+    </div>
+
+  <div class="tab-pane fade" id="uploads-tab-pane" role="tabpanel" aria-labelledby="uploads-tab-pane" tabindex="0">
+          <br>
+              <h4><i class="fas fa-upload"></i> Uploads</h4>
+          <p class="lead">Upload stats are coming soon 👨‍💻</p>
+  </div>
+
+      <div class="tab-pane fade" id="billing-tab-pane" role="tabpanel" aria-labelledby="billing-tab-pane" tabindex="0">
+          <br>
+          <h4><i class="fas fa-money-check-alt"></i> Billing</h4>
+          <p class="lead">Premium features are coming soon. Get ready with your 💰 😊</p>
+      </div>
+
+    <div class="tab-pane fade" id="support-tab-pane" role="tabpanel" aria-labelledby="support-tab-pane" tabindex="0">
+          <br>
+          <h4><i class="fas fa-question-circle"></i> Support</h4>
+          <p class="lead">Help is on your way 🪜</p>
+      </div>
+
 </div>
 </div>
+
+    <nav>
+
+
+
 <script>
   $(document).ready(function() {
         $('#flexSwitchCheckDefault').on('change', function() {

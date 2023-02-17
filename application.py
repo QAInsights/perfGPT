@@ -49,6 +49,8 @@ _vars = load_env_vars(application)
 mp = Mixpanel(_vars['MIXPANEL_US'])
 github_bp = make_github_blueprint()
 
+
+
 application.config.update(dict(PREFERRED_URL_SCHEME='https'))
 application.wsgi_app = ReverseProxied(application.wsgi_app)
 application.register_blueprint(github_bp, url_prefix="/login")

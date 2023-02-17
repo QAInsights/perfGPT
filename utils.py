@@ -37,7 +37,7 @@ def load_env_vars(application):
         _vars['MIXPANEL_US'] = os.environ['MIXPANEL_US']
         _vars['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
 
-    elif os.getenv('FLASK_ENV') == "prod":
+    elif os.getenv('FLASK_ENV') == "production":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
         application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID',
                                                                                  constants.AWS_DEFAULT_REGION,
@@ -51,6 +51,11 @@ def load_env_vars(application):
         _vars['OPENAI_API_KEY'] = secrets_client.get_secret('OPENAI_API_KEY',
                                                             constants.AWS_DEFAULT_REGION,
                                                             credentials)
+
+        _vars['ANALYTICS_URL'] = secrets_client.get_secret('ANALYTICS_URL',
+                                                           constants.AWS_DEFAULT_REGION,
+                                                           credentials)
+        print(_vars['ANALYTICS_URL'])
 
     else:
         print("No environment exists.")
@@ -93,12 +98,12 @@ re_init()
 
 table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
-get_analytics_url = os.environ['AWS_GATEWAY_URL']
 
 
 def log_settings_db(username, slack_webhook=None, send_notifications=None, dynamodb=None):
     """
 
+    :param dynamodb:
     :param send_notifications:
     :param username:
     :param slack_webhook:
@@ -129,6 +134,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
            openai_created=None, slack_webhook=None, dynamodb=None):
     """
 
+    :param dynamodb:
     :param slack_webhook:
     :param username:
     :param openai_id:
@@ -161,6 +167,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
 def get_upload_count(username, dynamodb=None):
     """
 
+    :param dynamodb:
     :param username:    username
     :return:            returns the upload count of the user
     """
@@ -343,6 +350,15 @@ def get_analytics_data():
 
     :return:    get analytics data from dynamodb
     """
-    get_analytics = requests.get(get_analytics_url).text
+    get_analytics = None
+    if os.getenv('FLASK_ENV') == "development":
+        get_analytics = os.environ['AWS_GATEWAY_URL']
+    elif os.getenv('FLASK_ENV') == "production":
+        get_analytics = requests.get(secrets_client.get_secret('ANALYTICS_URL',
+                                                               constants.AWS_DEFAULT_REGION,
+                                                               credentials)).text
+    else:
+        print("No environment exits")
+        exit(1)
 
     return json.loads(get_analytics)
