@@ -9,7 +9,6 @@ from botocore.exceptions import ClientError
 from flask import redirect, url_for
 from flask_dance.contrib.github import github
 
-
 import constants
 from secrets_client import Sts
 
@@ -18,7 +17,11 @@ import json
 
 logging.basicConfig(level=logging.INFO)
 
-sts_client = boto3.client('sts', region_name=constants.AWS_DEFAULT_REGION)
+sts_client = boto3.client('sts',
+                          region_name=constants.AWS_DEFAULT_REGION,
+                          aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
+                          aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET']
+                          )
 credentials = Sts()
 
 dynamodb = None
@@ -26,22 +29,29 @@ dynamodb = None
 
 def refresh_credentials():
     global dynamodb
-    response = sts_client.assume_role(RoleArn=os.environ['ARN'],
-                                      RoleSessionName='my_session')
-    access_key_id = response['Credentials']['AccessKeyId']
-    secret_access_key = response['Credentials']['SecretAccessKey']
-    session_token = response['Credentials']['SessionToken']
-    credentials.set_credentials(access_key_id, secret_access_key, session_token)
-    dynamodb = init_dynamodb()
+    try:
+        response = sts_client.assume_role(RoleArn=os.environ['ARN'],
+                                          RoleSessionName='my_session')
+        access_key_id = response['Credentials']['AccessKeyId']
+        secret_access_key = response['Credentials']['SecretAccessKey']
+        session_token = response['Credentials']['SessionToken']
+        credentials.set_credentials(access_key_id, secret_access_key, session_token)
+
+        dynamodb = init_dynamodb()
+    except Exception as e:
+        print(e)
 
 
 def init_dynamodb():
-    dynamodb = boto3.resource('dynamodb',
-                              aws_secret_access_key=credentials.aws_access_key_id,
-                              aws_access_key_id=credentials.aws_secret_access_key,
-                              aws_session_token=credentials.aws_session_token,
-                              region_name=constants.AWS_DEFAULT_REGION)
-    return dynamodb
+    try:
+        dynamodb = boto3.resource('dynamodb',
+                                  aws_secret_access_key=credentials.aws_secret_access_key,
+                                  aws_access_key_id=credentials.aws_access_key_id,
+                                  aws_session_token=credentials.aws_session_token,
+                                  region_name=constants.AWS_DEFAULT_REGION)
+        return dynamodb
+    except Exception as e:
+        print(e)
 
 
 refresh_credentials()
@@ -73,7 +83,7 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
             return db_status
         else:
             return db_status
-        
+
     except dynamodb.exceptions.ExpiredTokenException:
         refresh_credentials()
         dynamodb = init_dynamodb()

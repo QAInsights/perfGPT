@@ -120,7 +120,7 @@ def github_sign():
 @login_required
 def upload():
     try:
-        upload_count = get_upload_count(check_authorized_status()['username']) - 1
+        upload_count = get_upload_count(get_username()) - 1
         webhook = get_webhook()
 
         if upload_count == 0:
