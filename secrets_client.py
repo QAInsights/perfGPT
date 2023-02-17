@@ -1,9 +1,6 @@
 import boto3
 from botocore.exceptions import ClientError
 import json
-import os
-
-import constants
 
 
 class Sts:
@@ -33,28 +30,21 @@ class Sts:
         return self._aws_session_token
 
 
-def get_secret(secret_name, region_name):
-    sts_client = boto3.client('sts',
-                              region_name=region_name,
-                              aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
-                              aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET']
-                              )
+def get_secret(secret_name, region_name, credentials):
+    """Get secrets from AWS Secret Manager
 
-    credentials = Sts()
-
-    response = sts_client.assume_role(RoleArn=os.environ['ARN'],
-                                      RoleSessionName='my_session')
-    access_key_id = response['Credentials']['AccessKeyId']
-    secret_access_key = response['Credentials']['SecretAccessKey']
-    session_token = response['Credentials']['SessionToken']
-    # credentials.set_credentials(access_key_id, secret_access_key, session_token)
-
+    :param str secret_name: secret name
+    :param str region_name: region name
+    :param Sts credentials: Sts credentials object
+    :raises e: ClientError
+    :return str: value of the secret
+    """
     try:
         secrets_client = boto3.client(
             'secretsmanager',
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=secret_access_key,
-            aws_session_token=session_token,
+            aws_access_key_id=credentials.aws_access_key_id,
+            aws_secret_access_key=credentials.aws_secret_access_key,
+            aws_session_token=credentials.aws_session_token,
             region_name=region_name)
 
         get_secret_value_response = secrets_client.get_secret_value(

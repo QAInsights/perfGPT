@@ -1,4 +1,3 @@
-from calendar import day_abbr
 import logging
 import os
 import re
@@ -10,10 +9,13 @@ from flask import redirect, url_for
 from flask_dance.contrib.github import github
 
 import constants
+import secrets_client
 from secrets_client import Sts
 
 from decimal import Decimal
 import json
+from dotenv import load_dotenv
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,9 +28,27 @@ credentials = Sts()
 
 dynamodb = None
 
+def load_env_vars(application):
+    load_dotenv()
+    _vars = {}
+    if os.getenv('FLASK_ENV') == "development":
+        application.secret_key = os.environ['FLASK_SECRET_KEY']
+        application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
+        application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+        _vars['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
+    elif os.getenv('FLASK_ENV') == "prod":
+        application.secret_key = os.environ['FLASK_SECRET_KEY']
+        application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID', constants.AWS_DEFAULT_REGION, credentials)
+        application.config["GITHUB_OAUTH_CLIENT_SECRET"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_SECRET', constants.AWS_DEFAULT_REGION, credentials)
+        _vars['OPENAI_API_KEY'] = secrets_client.get_secret('OPENAI_API_KEY', constants.AWS_DEFAULT_REGION, credentials)
+
+    else:
+        print("No environment exists.")
+        exit(1)
+    return _vars
+
 
 def refresh_credentials():
-    global dynamodb
     try:
         response = sts_client.assume_role(RoleArn=os.environ['ARN'],
                                           RoleSessionName='my_session')
@@ -36,8 +56,7 @@ def refresh_credentials():
         secret_access_key = response['Credentials']['SecretAccessKey']
         session_token = response['Credentials']['SessionToken']
         credentials.set_credentials(access_key_id, secret_access_key, session_token)
-
-        dynamodb = init_dynamodb()
+        
     except Exception as e:
         print(e)
 
@@ -54,7 +73,12 @@ def init_dynamodb():
         print(e)
 
 
-refresh_credentials()
+def re_init():
+    global dynamodb
+    refresh_credentials()
+    dynamodb = init_dynamodb()
+
+re_init()
 
 table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
 settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
@@ -85,8 +109,7 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
             return db_status
 
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
 
@@ -119,8 +142,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
             }
         )
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
 
@@ -138,8 +160,7 @@ def get_upload_count(username, dynamodb=None):
             total_count = response['Count']
         return int(total_count)
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
 
@@ -211,12 +232,9 @@ def get_webhook():
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
         if response['Items'][0]['slack_webhook']:
             return response['Items'][0]['slack_webhook']
-        else:
-            return None
-        print(response)
+        return None
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except Exception as e:
         print(e)
 
@@ -243,8 +261,7 @@ def get_total_users_count(dynamodb=None):
             users.add(item['username'])
         return len(users)
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
         return None
@@ -263,8 +280,7 @@ def get_upload_counts_all(dynamodb=None):
 
         return len(unique_openids)
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
         return None
@@ -288,8 +304,7 @@ def get_total_tokens_all(dynamodb=None):
 
         return total_tokens
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except ClientError as e:
         print(e)
         return None
@@ -307,8 +322,7 @@ def get_slack_notification_status(dynamodb=None):
         else:
             return None
     except dynamodb.exceptions.ExpiredTokenException:
-        refresh_credentials()
-        dynamodb = init_dynamodb()
+        re_init()
     except Exception as e:
         print(e)
 

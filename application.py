@@ -5,14 +5,13 @@ from flask import Flask, request, render_template, jsonify
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
 
-import secrets_client
 from integrations.slack import slack
 import version
 from utils import *
 from analytics import *
 import schedule
 import time
-from dotenv import load_dotenv
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -44,29 +43,12 @@ def login_required(func):
 application = Flask(__name__)
 
 # Load all env variables
-load_dotenv()
-if os.getenv('FLASK_ENV') == "development":
-    application.secret_key = os.environ['FLASK_SECRET_KEY']
-    application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
-    application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
-    openai_api_key = os.environ['OPENAI_API_KEY']
-elif os.getenv('FLASK_ENV') == "prod":
-    application.secret_key = os.environ['FLASK_SECRET_KEY']
-    application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID', constants.AWS_DEFAULT_REGION)
-    application.config["GITHUB_OAUTH_CLIENT_SECRET"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_SECRET', constants.AWS_DEFAULT_REGION)
-    openai_api_key = secrets_client.get_secret('OPENAI_API_KEY', constants.AWS_DEFAULT_REGION)
-
-else:
-    print("No environment exists.")
-    exit(1)
+_vars = load_env_vars(application)
 
 github_bp = make_github_blueprint()
 
-application.config.update(dict(
-    PREFERRED_URL_SCHEME='https'
-))
+application.config.update(dict(PREFERRED_URL_SCHEME='https'))
 application.wsgi_app = ReverseProxied(application.wsgi_app)
-
 application.register_blueprint(github_bp, url_prefix="/login")
 # os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -226,88 +208,86 @@ def askgpt_upload():
         username = resp.json()["login"]
         upload_count = get_upload_count(check_authorized_status()['username']) - 1
         try:
-            openai.api_key = openai_api_key
+            openai.api_key = _vars['OPENAI_API_KEY']
         except KeyError:
             return render_template("analysis_response.html", response="API key not set.",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
                                    version=version.__version__)
 
-        if request.files['file'].filename == '':
-            return render_template('analysis_response.html', response="Please upload a valid file.",
-                                   auth=check_authorized_status(),
-                                   upload_count=upload_count,
-                                   version=version.__version__)
+        if request.files:
+            if request.files['file'].filename == '':
+                return render_template('analysis_response.html', response="Please upload a valid file.",
+                                    auth=check_authorized_status(),
+                                    upload_count=upload_count,
+                                    version=version.__version__)
+            file = request.files['file']
+            try:
+                if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
+                    contents = pd.read_csv(file)
+                if file.filename.endswith('.json'):
+                    contents = pd.read_json(file)
+            except Exception as e:
+                return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
+                                                                            "the file is not empty and is in one of "
+                                                                            "the"
+                                                                            " supported formats.",
+                                        auth=check_authorized_status(),
+                                        upload_count=upload_count,
+                                        version=version.__version__)
 
-        if request.method == 'POST':
-            if request.files:
-                file = request.files['file']
-                try:
-                    if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
-                        contents = pd.read_csv(file)
-                    if file.filename.endswith('.json'):
-                        contents = pd.read_json(file)
-                except Exception as e:
-                    return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
-                                                                              "the file is not empty and is in one of "
-                                                                              "the"
-                                                                              " supported formats.",
-                                           auth=check_authorized_status(),
-                                           upload_count=upload_count,
-                                           version=version.__version__)
+            if contents.memory_usage().sum() > constants.FILE_SIZE:
+                return render_template('analysis_response.html', response="File size too large.",
+                                        auth=check_authorized_status(),
+                                        upload_count=upload_count,
+                                        version=version.__version__)
+            try:
+                responses = {}
+                for title, prompt in prompts.items():
+                    response = openai.Completion.create(
+                        model=constants.model,
+                        prompt=f"""
+                        {prompt}: \n {contents}
+                        """,
+                        temperature=constants.temperature,
+                        max_tokens=constants.max_tokens,
+                        top_p=constants.top_p,
+                        frequency_penalty=constants.frequency_penalty,
+                        presence_penalty=constants.presence_penalty
+                    )
+                    log_db(username=username, openai_id=response['id'],
+                            openai_prompt_tokens=response['usage']['prompt_tokens'],
+                            openai_completion_tokens=response['usage']['completion_tokens'],
+                            openai_total_tokens=response['usage']['total_tokens'],
+                            openai_created=response['created'])
 
-                if contents.memory_usage().sum() > constants.FILE_SIZE:
-                    return render_template('analysis_response.html', response="File size too large.",
-                                           auth=check_authorized_status(),
-                                           upload_count=upload_count,
-                                           version=version.__version__)
-                try:
-                    responses = {}
-                    for title, prompt in prompts.items():
-                        response = openai.Completion.create(
-                            model=constants.model,
-                            prompt=f"""
-                            {prompt}: \n {contents}
-                            """,
-                            temperature=constants.temperature,
-                            max_tokens=constants.max_tokens,
-                            top_p=constants.top_p,
-                            frequency_penalty=constants.frequency_penalty,
-                            presence_penalty=constants.presence_penalty
-                        )
-                        log_db(username=username, openai_id=response['id'],
-                               openai_prompt_tokens=response['usage']['prompt_tokens'],
-                               openai_completion_tokens=response['usage']['completion_tokens'],
-                               openai_total_tokens=response['usage']['total_tokens'],
-                               openai_created=response['created'])
+                    # Send Slack Notifications if enabled
+                    if get_slack_notification_status() == 'true':
+                        try:
+                            slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                                                            filename=file.filename,
+                                                            title=title,
+                                                            webhook=get_webhook())
+                        except Exception as e:
+                            pass
 
-                        # Send Slack Notifications if enabled
-                        if get_slack_notification_status() == 'true':
-                            try:
-                                slack.send_slack_notifications(msg=response['choices'][0]['text'],
-                                                               filename=file.filename,
-                                                               title=title,
-                                                               webhook=get_webhook())
-                            except Exception as e:
-                                pass
+                    response = beautify_response(response['choices'][0]['text'])
 
-                        response = beautify_response(response['choices'][0]['text'])
+                    responses[title] = response
 
-                        responses[title] = response
-
-                    return render_template("analysis_response.html", response=responses,
-                                           auth=check_authorized_status(),
-                                           upload_count=upload_count,
-                                           version=version.__version__)
-                except Exception as e:
-                    return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
-                                           upload_count=upload_count,
-                                           version=version.__version__)
-            else:
-                return render_template('analysis_response.html', response="Upload a valid file",
-                                       auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       version=version.__version__)
+                return render_template("analysis_response.html", response=responses,
+                                        auth=check_authorized_status(),
+                                        upload_count=upload_count,
+                                        version=version.__version__)
+            except Exception as e:
+                return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+                                        upload_count=upload_count,
+                                        version=version.__version__)
+        else:
+            return render_template('analysis_response.html', response="Upload a valid file",
+                                    auth=check_authorized_status(),
+                                    upload_count=upload_count,
+                                    version=version.__version__)
     except Exception as e:
         print(e)
         return render_template("invalid.html", image=invalid_image, response=e,
@@ -342,7 +322,7 @@ if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
 
     # STS credentials expire after 1 hour, so refresh every 50 minutes
-    schedule.every(50).minutes.do(refresh_credentials)
+    schedule.every(50).minutes.do(re_init)
     while True:
         schedule.run_pending()
         time.sleep(60)
