@@ -4,12 +4,15 @@ import pandas as pd
 from flask import Flask, request, render_template, jsonify
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
+
+import secrets_client
 from integrations.slack import slack
 import version
 from utils import *
 from analytics import *
 import schedule
 import time
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,9 +43,23 @@ def login_required(func):
 
 application = Flask(__name__)
 
-application.secret_key = os.environ['FLASK_SECRET_KEY']
-application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
-application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+# Load all env variables
+load_dotenv()
+if os.getenv('FLASK_ENV') == "development":
+    application.secret_key = os.environ['FLASK_SECRET_KEY']
+    application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
+    application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
+    openai_api_key = os.environ['OPENAI_API_KEY']
+elif os.getenv('FLASK_ENV') == "prod":
+    application.secret_key = os.environ['FLASK_SECRET_KEY']
+    application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID', constants.AWS_DEFAULT_REGION)
+    application.config["GITHUB_OAUTH_CLIENT_SECRET"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_SECRET', constants.AWS_DEFAULT_REGION)
+    openai_api_key = secrets_client.get_secret('OPENAI_API_KEY', constants.AWS_DEFAULT_REGION)
+
+else:
+    print("No environment exists.")
+    exit(1)
+
 github_bp = make_github_blueprint()
 
 application.config.update(dict(
@@ -209,7 +226,7 @@ def askgpt_upload():
         username = resp.json()["login"]
         upload_count = get_upload_count(check_authorized_status()['username']) - 1
         try:
-            openai.api_key = os.environ['OPENAI_API_KEY']
+            openai.api_key = openai_api_key
         except KeyError:
             return render_template("analysis_response.html", response="API key not set.",
                                    auth=check_authorized_status(),
@@ -323,6 +340,7 @@ def save_slack_notifications():
 
 if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
+
     # STS credentials expire after 1 hour, so refresh every 50 minutes
     schedule.every(50).minutes.do(refresh_credentials)
     while True:
