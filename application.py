@@ -81,7 +81,6 @@ def index():
             log_db(username=username)
 
         get_analytics_response = get_analytics_data()
-
         return render_template("index.html", image=hero_image,
                                total_tokens=get_analytics_response['total_tokens'],
                                total_users=get_analytics_response['total_users'],
