@@ -55,7 +55,6 @@ def load_env_vars(application):
         _vars['ANALYTICS_URL'] = secrets_client.get_secret('ANALYTICS_URL',
                                                            constants.AWS_DEFAULT_REGION,
                                                            credentials)
-        print(_vars['ANALYTICS_URL'])
 
     else:
         print("No environment exists.")
@@ -77,21 +76,26 @@ def refresh_credentials():
 
 
 def init_dynamodb():
+    global dynamodb
     try:
-        dynamodb = boto3.resource('dynamodb',
-                                  aws_secret_access_key=credentials.aws_secret_access_key,
-                                  aws_access_key_id=credentials.aws_access_key_id,
-                                  aws_session_token=credentials.aws_session_token,
-                                  region_name=constants.AWS_DEFAULT_REGION)
+        session = boto3.Session(
+            aws_access_key_id=credentials.aws_access_key_id,
+            aws_secret_access_key=credentials.aws_secret_access_key,
+            aws_session_token=credentials.aws_session_token,
+        )
+        dynamodb = session.resource('dynamodb',
+                                    region_name=constants.AWS_DEFAULT_REGION)
         return dynamodb
     except Exception as e:
         print(e)
 
 
 def re_init():
+    print("Re Init")
     global dynamodb
     refresh_credentials()
     dynamodb = init_dynamodb()
+    print("After dyna")
 
 
 re_init()
@@ -124,10 +128,12 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
         else:
             return db_status
 
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
@@ -158,10 +164,12 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
                 "premium_user": False
             }
         )
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def get_upload_count(username, dynamodb=None):
@@ -177,10 +185,12 @@ def get_upload_count(username, dynamodb=None):
         if response:
             total_count = response['Count']
         return int(total_count)
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def check_authorized_status():
@@ -248,13 +258,17 @@ def get_webhook():
     """
     try:
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
-        if response['Items'][0]['slack_webhook']:
-            return response['Items'][0]['slack_webhook']
+
+        if response['Items']:
+            if response['Items'][0]['slack_webhook']:
+                return response['Items'][0]['slack_webhook']
         return None
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
-    except Exception as e:
-        print(e)
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def save_webhook_url(integration_type=None, webhook_url=None):
@@ -278,11 +292,12 @@ def get_total_users_count(dynamodb=None):
         for item in response['Items']:
             users.add(item['username'])
         return len(users)
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
-        return None
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def get_upload_counts_all(dynamodb=None):
@@ -297,11 +312,12 @@ def get_upload_counts_all(dynamodb=None):
             unique_openids.add(item['open_id'])
 
         return len(unique_openids)
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
-        return None
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def get_total_tokens_all(dynamodb=None):
@@ -321,11 +337,12 @@ def get_total_tokens_all(dynamodb=None):
                 total_tokens += item
 
         return total_tokens
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
     except ClientError as e:
-        print(e)
-        return None
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
+        else:
+            print(f"An error occurred: {e}")
 
 
 def get_slack_notification_status(dynamodb=None):
@@ -335,14 +352,17 @@ def get_slack_notification_status(dynamodb=None):
     """
     try:
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
-        if response['Items'][0]['send_notifications']:
-            return response['Items'][0]['send_notifications']
+        if response['Items']:
+            if response['Items'][0]['send_notifications']:
+                return response['Items'][0]['send_notifications']
+            else:
+                return None
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+            re_init()
         else:
-            return None
-    except dynamodb.exceptions.ExpiredTokenException:
-        re_init()
-    except Exception as e:
-        print(e)
+            print(f"An error occurred: {e}")
 
 
 def get_analytics_data():
