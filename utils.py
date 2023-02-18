@@ -36,6 +36,7 @@ def load_env_vars(application):
         application.config["GITHUB_OAUTH_CLIENT_SECRET"] = os.environ['GITHUB_OAUTH_CLIENT_SECRET']
         _vars['MIXPANEL_US'] = os.environ['MIXPANEL_US']
         _vars['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
+        _vars['SENTRY_KEY'] = os.environ['SENTRY_KEY']
 
     elif os.getenv('FLASK_ENV') == "production":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
@@ -55,6 +56,9 @@ def load_env_vars(application):
         _vars['ANALYTICS_URL'] = secrets_client.get_secret('ANALYTICS_URL',
                                                            constants.AWS_DEFAULT_REGION,
                                                            credentials)
+        _vars['SENTRY_KEY'] = secrets_client.get_secret('SENTRY_KEY',
+                                                        constants.AWS_DEFAULT_REGION,
+                                                        credentials)
 
     else:
         print("No environment exists.")
@@ -91,11 +95,9 @@ def init_dynamodb():
 
 
 def re_init():
-    print("Re Init")
     global dynamodb
     refresh_credentials()
     dynamodb = init_dynamodb()
-    print("After dyna")
 
 
 re_init()
