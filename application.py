@@ -13,6 +13,21 @@ import schedule
 import time
 from mixpanel import Mixpanel
 
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+application = Flask(__name__)
+
+# Load all env variables
+_vars = load_env_vars(application)
+
+sentry_sdk.init(
+    dsn=_vars['SENTRY_KEY'],
+    integrations=[
+        FlaskIntegration(),
+    ],
+    traces_sample_rate=1.0
+)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,20 +56,12 @@ def login_required(func):
     return wrapper
 
 
-application = Flask(__name__)
-
-# Load all env variables
-_vars = load_env_vars(application)
-
 mp = Mixpanel(_vars['MIXPANEL_US'])
 github_bp = make_github_blueprint()
-
-
 
 application.config.update(dict(PREFERRED_URL_SCHEME='https'))
 application.wsgi_app = ReverseProxied(application.wsgi_app)
 application.register_blueprint(github_bp, url_prefix="/login")
-# os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 # Images
 IMAGES_FOLDER = os.path.join('static', 'images')
@@ -70,6 +77,7 @@ def favicon():
 
 
 @application.route('/')
+@application.route('/debug-sentry')
 def index():
     """
     index
@@ -95,6 +103,7 @@ def index():
 
 
 @application.errorhandler(404)
+@application.route('/debug-sentry')
 def page_not_found(error):
     try:
         auth = check_authorized_status()
@@ -111,6 +120,7 @@ def page_not_found(error):
 
 
 @application.route('/signin')
+@application.route('/debug-sentry')
 @login_required
 def github_sign():
     username = get_username()
@@ -121,6 +131,7 @@ def github_sign():
 
 
 @application.route('/upload')
+@application.route('/debug-sentry')
 @login_required
 def upload():
     try:
@@ -146,6 +157,7 @@ def upload():
 
 
 @application.route('/about')
+@application.route('/debug-sentry')
 def about():
     """
 
@@ -156,6 +168,7 @@ def about():
 
 
 @application.route('/features')
+@application.route('/debug-sentry')
 def features():
     """
 
@@ -165,6 +178,7 @@ def features():
 
 
 @application.route('/help')
+@application.route('/debug-sentry')
 def help_page():
     """
 
@@ -174,6 +188,7 @@ def help_page():
 
 
 @application.route('/account')
+@application.route('/debug-sentry')
 @login_required
 def account():
     """
@@ -199,6 +214,7 @@ def account():
 
 
 @application.route('/analyze', methods=['POST'])
+@application.route('/debug-sentry')
 @login_required
 def askgpt_upload():
     """
@@ -227,9 +243,9 @@ def askgpt_upload():
         if request.files:
             if request.files['file'].filename == '':
                 return render_template('analysis_response.html', response="Please upload a valid file.",
-                                    auth=check_authorized_status(),
-                                    upload_count=upload_count,
-                                    version=version.__version__)
+                                       auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       version=version.__version__)
             file = request.files['file']
             try:
                 if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
@@ -238,18 +254,18 @@ def askgpt_upload():
                     contents = pd.read_json(file)
             except Exception as e:
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
-                                                                            "the file is not empty and is in one of "
-                                                                            "the"
-                                                                            " supported formats.",
-                                        auth=check_authorized_status(),
-                                        upload_count=upload_count,
-                                        version=version.__version__)
+                                                                          "the file is not empty and is in one of "
+                                                                          "the"
+                                                                          " supported formats.",
+                                       auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       version=version.__version__)
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
                 return render_template('analysis_response.html', response="File size too large.",
-                                        auth=check_authorized_status(),
-                                        upload_count=upload_count,
-                                        version=version.__version__)
+                                       auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       version=version.__version__)
             try:
                 responses = {}
                 for title, prompt in prompts.items():
@@ -265,18 +281,18 @@ def askgpt_upload():
                         presence_penalty=constants.presence_penalty
                     )
                     log_db(username=username, openai_id=response['id'],
-                            openai_prompt_tokens=response['usage']['prompt_tokens'],
-                            openai_completion_tokens=response['usage']['completion_tokens'],
-                            openai_total_tokens=response['usage']['total_tokens'],
-                            openai_created=response['created'])
+                           openai_prompt_tokens=response['usage']['prompt_tokens'],
+                           openai_completion_tokens=response['usage']['completion_tokens'],
+                           openai_total_tokens=response['usage']['total_tokens'],
+                           openai_created=response['created'])
 
                     # Send Slack Notifications if enabled
                     if get_slack_notification_status() == 'true':
                         try:
                             slack.send_slack_notifications(msg=response['choices'][0]['text'],
-                                                            filename=file.filename,
-                                                            title=title,
-                                                            webhook=get_webhook())
+                                                           filename=file.filename,
+                                                           title=title,
+                                                           webhook=get_webhook())
                         except Exception as e:
                             pass
 
@@ -285,18 +301,18 @@ def askgpt_upload():
                     responses[title] = response
 
                 return render_template("analysis_response.html", response=responses,
-                                        auth=check_authorized_status(),
-                                        upload_count=upload_count,
-                                        version=version.__version__)
+                                       auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       version=version.__version__)
             except Exception as e:
                 return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
-                                        upload_count=upload_count,
-                                        version=version.__version__)
+                                       upload_count=upload_count,
+                                       version=version.__version__)
         else:
             return render_template('analysis_response.html', response="Upload a valid file",
-                                    auth=check_authorized_status(),
-                                    upload_count=upload_count,
-                                    version=version.__version__)
+                                   auth=check_authorized_status(),
+                                   upload_count=upload_count,
+                                   version=version.__version__)
     except Exception as e:
         print(e)
         return render_template("invalid.html", image=invalid_image, response=e,
@@ -304,6 +320,7 @@ def askgpt_upload():
 
 
 @application.route('/saveslack', methods=['POST'])
+@application.route('/debug-sentry')
 @login_required
 def save_slack_key():
     settings_saved = save_webhook_url(integration_type="slack", webhook_url=request.form['slack_webhook'])
@@ -320,6 +337,7 @@ def save_slack_key():
 
 
 @application.route('/sendslacknotifications', methods=['POST'])
+@application.route('/debug-sentry')
 @login_required
 def save_slack_notifications():
     status = request.form['status']
