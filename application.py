@@ -12,8 +12,9 @@ from analytics import *
 import schedule
 import time
 from mixpanel import Mixpanel
-
+from sentry_sdk import capture_exception
 import sentry_sdk
+from sentry_sdk import start_transaction
 from sentry_sdk.integrations.flask import FlaskIntegration
 
 application = Flask(__name__)
@@ -87,17 +88,18 @@ def index():
         if github.authorized:
             username = get_username()
             log_db(username=username)
-
-        get_analytics_response = get_analytics_data()
-        return render_template("index.html", image=hero_image,
-                               total_tokens=get_analytics_response['total_tokens'],
-                               total_users=get_analytics_response['total_users'],
-                               total_uploads=get_analytics_response['total_uploads'],
-                               auth=check_authorized_status(),
-                               version=version.__version__)
+        with start_transaction(op="task", name="Home Page"):
+            get_analytics_response = get_analytics_data()
+            return render_template("index.html", image=hero_image,
+                                   total_tokens=get_analytics_response['total_tokens'],
+                                   total_users=get_analytics_response['total_users'],
+                                   total_uploads=get_analytics_response['total_uploads'],
+                                   auth=check_authorized_status(),
+                                   version=version.__version__)
 
     except Exception as e:
         print(e)
+        capture_exception(e)
         return render_template("index.html", image=hero_image, auth=check_authorized_status(),
                                version=version.__version__)
 
@@ -115,6 +117,7 @@ def page_not_found(error):
         return render_template("invalid.html", image=invalid_image, response=response,
                                auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
+        capture_exception(e)
         return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
 
@@ -136,22 +139,24 @@ def github_sign():
 def upload():
     try:
         mp.track(get_username(), 'Users in Upload page')
+        with start_transaction(op="task", name="Upload Page"):
 
-        upload_count = get_upload_count(get_username()) - 1
-        webhook = get_webhook()
+            upload_count = get_upload_count(get_username()) - 1
+            webhook = get_webhook()
 
-        if upload_count == 0:
-            return render_template('upload.html', auth=check_authorized_status(),
-                                   upload_count=0,
-                                   webhook=webhook,
-                                   version=version.__version__)
-        else:
-            return render_template('upload.html', auth=check_authorized_status(),
-                                   upload_count=upload_count,
-                                   webhook=webhook,
-                                   version=version.__version__)
+            if upload_count == 0:
+                return render_template('upload.html', auth=check_authorized_status(),
+                                       upload_count=0,
+                                       webhook=webhook,
+                                       version=version.__version__)
+            else:
+                return render_template('upload.html', auth=check_authorized_status(),
+                                       upload_count=upload_count,
+                                       webhook=webhook,
+                                       version=version.__version__)
     except Exception as e:
         print(e)
+        capture_exception(e)
         return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
 
@@ -209,6 +214,7 @@ def account():
                                auth=check_authorized_status(), version=version.__version__)
     except Exception as e:
         print(e)
+        capture_exception(e)
         return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
 
@@ -235,6 +241,7 @@ def askgpt_upload():
         try:
             openai.api_key = _vars['OPENAI_API_KEY']
         except KeyError:
+
             return render_template("analysis_response.html", response="API key not set.",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
@@ -253,6 +260,7 @@ def askgpt_upload():
                 if file.filename.endswith('.json'):
                     contents = pd.read_json(file)
             except Exception as e:
+                capture_exception(e)
                 return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of "
                                                                           "the"
@@ -294,6 +302,7 @@ def askgpt_upload():
                                                            title=title,
                                                            webhook=get_webhook())
                         except Exception as e:
+                            capture_exception(e)
                             pass
 
                     response = beautify_response(response['choices'][0]['text'])
@@ -315,6 +324,7 @@ def askgpt_upload():
                                    version=version.__version__)
     except Exception as e:
         print(e)
+        capture_exception(e)
         return render_template("invalid.html", image=invalid_image, response=e,
                                auth=check_authorized_status(), version=version.__version__)
 
@@ -340,16 +350,19 @@ def save_slack_key():
 @application.route('/debug-sentry')
 @login_required
 def save_slack_notifications():
-    status = request.form['status']
-    log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
-    return "Done"
+    try:
+        status = request.form['status']
+        log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
+        return "Done"
+    except Exception as e:
+        capture_exception(e)
 
 
 if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
 
     # STS credentials expire after 1 hour, so refresh every 50 minutes
-    schedule.every(50).minutes.do(re_init)
+    schedule.every(15).minutes.do(re_init)
     while True:
         schedule.run_pending()
         time.sleep(60)

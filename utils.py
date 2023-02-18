@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import traceback
 from decimal import Decimal
 
 import boto3
@@ -10,10 +11,11 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from flask_dance.contrib.github import github
+from sentry_sdk import capture_exception
 
 import constants
 import secrets_client
-from secrets_client import Sts
+from secrets_client import STSCredentials
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,14 +24,25 @@ sts_client = boto3.client('sts',
                           aws_access_key_id=os.environ['AWS_DYNAMODB_KEY'],
                           aws_secret_access_key=os.environ['AWS_DYNAMODB_SECRET']
                           )
-credentials = Sts()
+sts_credentials = STSCredentials(os.environ['ARN'])
 
 dynamodb = None
+table = None
+settings_table = None
 
 
 def load_env_vars(application):
+    global sts_credentials, dynamodb, table, settings_table
     load_dotenv()
     _vars = {}
+    _vars['ARN'] = os.environ['ARN']
+    sts_credentials.set_arn(_vars['ARN'])
+    credentials = sts_credentials.get_credentials()
+
+    dynamodb = init_dynamodb()
+    table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
+    settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
+
     if os.getenv('FLASK_ENV') == "development":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
         application.config["GITHUB_OAUTH_CLIENT_ID"] = os.environ['GITHUB_OAUTH_CLIENT_ID']
@@ -37,8 +50,10 @@ def load_env_vars(application):
         _vars['MIXPANEL_US'] = os.environ['MIXPANEL_US']
         _vars['OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
         _vars['SENTRY_KEY'] = os.environ['SENTRY_KEY']
+        _vars['ARN'] = os.environ['ARN']
 
     elif os.getenv('FLASK_ENV') == "production":
+
         application.secret_key = os.environ['FLASK_SECRET_KEY']
         application.config["GITHUB_OAUTH_CLIENT_ID"] = secrets_client.get_secret('GITHUB_OAUTH_CLIENT_ID',
                                                                                  constants.AWS_DEFAULT_REGION,
@@ -63,47 +78,32 @@ def load_env_vars(application):
     else:
         print("No environment exists.")
         exit(1)
+    sts_credentials = STSCredentials(os.environ['ARN'])
     return _vars
 
 
-def refresh_credentials():
-    try:
-        response = sts_client.assume_role(RoleArn=os.environ['ARN'],
-                                          RoleSessionName='my_session')
-        access_key_id = response['Credentials']['AccessKeyId']
-        secret_access_key = response['Credentials']['SecretAccessKey']
-        session_token = response['Credentials']['SessionToken']
-        credentials.set_credentials(access_key_id, secret_access_key, session_token)
-
-    except Exception as e:
-        print(e)
+def print_exceptions(e):
+    print("Exception occurred on line:", traceback.format_exc().split("\n"))
 
 
 def init_dynamodb():
-    global dynamodb
+    global dynamodb, sts_credentials
     try:
+
+        credentials = sts_credentials.get_credentials()
+
         session = boto3.Session(
-            aws_access_key_id=credentials.aws_access_key_id,
-            aws_secret_access_key=credentials.aws_secret_access_key,
-            aws_session_token=credentials.aws_session_token,
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretAccessKey'],
+            aws_session_token=credentials['SessionToken']
         )
         dynamodb = session.resource('dynamodb',
                                     region_name=constants.AWS_DEFAULT_REGION)
         return dynamodb
     except Exception as e:
+        print_exceptions(e)
+        capture_exception(e)
         print(e)
-
-
-def re_init():
-    global dynamodb
-    refresh_credentials()
-    dynamodb = init_dynamodb()
-
-
-re_init()
-
-table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
-settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
 
 
 def log_settings_db(username, slack_webhook=None, send_notifications=None, dynamodb=None):
@@ -116,6 +116,7 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
     :return:
     """
     try:
+        init_dynamodb()
         db_response = settings_table.put_item(
             Item={
                 "username": username,
@@ -133,7 +134,10 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
     except ClientError as e:
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            # re_init()
+            capture_exception(e)
+            print_exceptions(e)
+
         else:
             print(f"An error occurred: {e}")
 
@@ -153,6 +157,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
     :return:
     """
     try:
+        init_dynamodb()
         db_response = table.put_item(
             Item={
                 "username": username,
@@ -167,32 +172,36 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
             }
         )
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
-def get_upload_count(username, dynamodb=None):
+def get_upload_count(username):
     """
 
-    :param dynamodb:
     :param username:    username
     :return:            returns the upload count of the user
     """
     try:
+        init_dynamodb()
         total_count = 0
         response = table.query(KeyConditionExpression=Key('username').eq(username))
         if response:
             total_count = response['Count']
         return int(total_count)
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
 def check_authorized_status():
@@ -249,7 +258,8 @@ def get_username():
         username = resp.json()["login"]
         return username
     except Exception as e:
-        print(e)
+        print_exceptions(e)
+        capture_exception(e)
         return username
 
 
@@ -259,6 +269,7 @@ def get_webhook():
     :return:
     """
     try:
+        init_dynamodb()
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
 
         if response['Items']:
@@ -266,11 +277,13 @@ def get_webhook():
                 return response['Items'][0]['slack_webhook']
         return None
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            capture_exception(e)
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
 def save_webhook_url(integration_type=None, webhook_url=None):
@@ -283,31 +296,35 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
 
 
-def get_total_users_count(dynamodb=None):
+def get_total_users_count():
     """
 
     :return:    total users count
     """
     try:
+        init_dynamodb()
         response = table.scan()
         users = set()
         for item in response['Items']:
             users.add(item['username'])
         return len(users)
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            capture_exception(e)
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
-def get_upload_counts_all(dynamodb=None):
+def get_upload_counts_all():
     """
     return the total upload count for all the users
     :return:    count of open_id count
     """
     try:
+        init_dynamodb()
         response = table.scan()
         unique_openids = set()
         for item in response['Items']:
@@ -315,19 +332,22 @@ def get_upload_counts_all(dynamodb=None):
 
         return len(unique_openids)
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            capture_exception(e)
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
-def get_total_tokens_all(dynamodb=None):
+def get_total_tokens_all():
     """
 
     :return:    count of all the tokens from all the users
     """
     try:
+        init_dynamodb()
         response = table.scan()
         openai_total_tokens = set()
         for item in response['Items']:
@@ -340,19 +360,22 @@ def get_total_tokens_all(dynamodb=None):
 
         return total_tokens
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            capture_exception(e)
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
-def get_slack_notification_status(dynamodb=None):
+def get_slack_notification_status():
     """
 
     :return:    the Slack notifications status true or false
     """
     try:
+        init_dynamodb()
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
         if response['Items']:
             if response['Items'][0]['send_notifications']:
@@ -360,11 +383,13 @@ def get_slack_notification_status(dynamodb=None):
             else:
                 return None
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            re_init()
+            capture_exception(e)
         else:
             print(f"An error occurred: {e}")
+            capture_exception(e)
 
 
 def get_analytics_data():
@@ -372,13 +397,23 @@ def get_analytics_data():
 
     :return:    get analytics data from dynamodb
     """
-    if os.getenv('FLASK_ENV') == "development":
-        get_analytics = requests.get(os.environ['AWS_GATEWAY_URL']).text
-    elif os.getenv('FLASK_ENV') == "production":
-        get_analytics = requests.get(secrets_client.get_secret('ANALYTICS_URL',
-                                                               constants.AWS_DEFAULT_REGION,
-                                                               credentials)).text
-    else:
-        print("No environment exits")
+    try:
+        init_dynamodb()
+        credentials = sts_credentials.get_credentials()
+        if os.getenv('FLASK_ENV') == "development":
+            get_analytics = requests.get(os.environ['AWS_GATEWAY_URL']).text
+        elif os.getenv('FLASK_ENV') == "production":
+            get_analytics = requests.get(secrets_client.get_secret('ANALYTICS_URL',
+                                                                   constants.AWS_DEFAULT_REGION,
+                                                                   credentials)).text
+        else:
+            print("No environment exits")
 
-    return json.loads(get_analytics)
+        return json.loads(get_analytics)
+    except ClientError as e:
+        print_exceptions(e)
+        capture_exception(e)
+
+
+if __name__ == '__main__':
+    print("Test")
