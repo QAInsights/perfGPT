@@ -370,15 +370,13 @@ def get_analytics_data():
 
     :return:    get analytics data from dynamodb
     """
-    get_analytics = None
     if os.getenv('FLASK_ENV') == "development":
-        get_analytics = os.environ['AWS_GATEWAY_URL']
+        get_analytics = requests.get(os.environ['AWS_GATEWAY_URL']).text
     elif os.getenv('FLASK_ENV') == "production":
         get_analytics = requests.get(secrets_client.get_secret('ANALYTICS_URL',
                                                                constants.AWS_DEFAULT_REGION,
                                                                credentials)).text
     else:
         print("No environment exits")
-        exit(1)
 
     return json.loads(get_analytics)
