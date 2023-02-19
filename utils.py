@@ -40,8 +40,7 @@ def load_env_vars(application):
     credentials = sts_credentials.get_credentials()
 
     dynamodb = init_dynamodb()
-    table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
-    settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
+
 
     if os.getenv('FLASK_ENV') == "development":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
@@ -87,7 +86,8 @@ def print_exceptions(e):
 
 
 def init_dynamodb():
-    global dynamodb, sts_credentials
+
+    global dynamodb, sts_credentials, table, settings_table
     try:
 
         credentials = sts_credentials.get_credentials()
@@ -99,6 +99,9 @@ def init_dynamodb():
         )
         dynamodb = session.resource('dynamodb',
                                     region_name=constants.AWS_DEFAULT_REGION)
+        table = dynamodb.Table(os.environ['DYNAMODB_PERFGPT_TABLE'])
+        settings_table = dynamodb.Table(os.environ['DYNAMODB_SETTINGS_TABLE'])
+
         return dynamodb
     except Exception as e:
         print_exceptions(e)
