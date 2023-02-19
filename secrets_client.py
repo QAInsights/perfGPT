@@ -12,7 +12,7 @@ class STSCredentials:
         self.credentials = None
         self.expiration = None
 
-    def get_credentials(self):
+    def get_credentials(self, sts_client):
         now_utc = datetime.datetime.utcnow()
         now_utc_str = now_utc.strftime('%Y-%m-%d %H:%M:%S+00:00')
         now_utc = datetime.datetime.strptime(now_utc_str, '%Y-%m-%d %H:%M:%S+00:00')
@@ -21,7 +21,7 @@ class STSCredentials:
             expiration = datetime.datetime.strptime(expiration_str, '%Y-%m-%d %H:%M:%S+00:00')
 
         if self.credentials is None or now_utc >= expiration:
-            sts_client = boto3.client('sts')
+            # sts_client = boto3.client('sts')
             response = sts_client.assume_role(
                 RoleArn=self.role_arn,
                 RoleSessionName=self.session_name,

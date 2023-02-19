@@ -37,7 +37,7 @@ def load_env_vars(application):
     _vars = {}
     _vars['ARN'] = os.environ['ARN']
     sts_credentials.set_arn(_vars['ARN'])
-    credentials = sts_credentials.get_credentials()
+    credentials = sts_credentials.get_credentials(sts_client)
 
     dynamodb = init_dynamodb()
 
@@ -90,7 +90,7 @@ def init_dynamodb():
     global dynamodb, sts_credentials, table, settings_table
     try:
 
-        credentials = sts_credentials.get_credentials()
+        credentials = sts_credentials.get_credentials(sts_client)
 
         session = boto3.Session(
             aws_access_key_id=credentials['AccessKeyId'],
@@ -402,7 +402,7 @@ def get_analytics_data():
     """
     try:
         init_dynamodb()
-        credentials = sts_credentials.get_credentials()
+        credentials = sts_credentials.get_credentials(sts_client)
         if os.getenv('FLASK_ENV') == "development":
             get_analytics = requests.get(os.environ['AWS_GATEWAY_URL']).text
         elif os.getenv('FLASK_ENV') == "production":

@@ -1,7 +1,6 @@
-from urllib import response
 import openai
 import pandas as pd
-from flask import Flask, request, render_template, jsonify, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
 
@@ -9,8 +8,6 @@ from integrations.slack import slack
 import version
 from utils import *
 from analytics import *
-import schedule
-import time
 from mixpanel import Mixpanel
 from sentry_sdk import capture_exception
 import sentry_sdk
@@ -142,17 +139,14 @@ def upload():
         with start_transaction(op="task", name="Upload Page"):
 
             upload_count = get_upload_count(get_username()) - 1
-            webhook = get_webhook()
 
             if upload_count == 0:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=0,
-                                       webhook=webhook,
                                        version=version.__version__)
             else:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=upload_count,
-                                       webhook=webhook,
                                        version=version.__version__)
     except Exception as e:
         print(e)
@@ -261,7 +255,7 @@ def askgpt_upload():
                     contents = pd.read_json(file)
             except Exception as e:
                 capture_exception(e)
-                return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
+                return render_template('invalid.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of "
                                                                           "the"
                                                                           " supported formats.",
@@ -270,7 +264,7 @@ def askgpt_upload():
                                        version=version.__version__)
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('analysis_response.html', response="File size too large.",
+                return render_template('invalid.html', response="File size too large.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
@@ -310,15 +304,15 @@ def askgpt_upload():
                     responses[title] = response
 
                 return render_template("analysis_response.html", response=responses,
-                                       auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       version=version.__version__)
+                                        auth=check_authorized_status(),
+                                        upload_count=upload_count,
+                                        version=version.__version__)
             except Exception as e:
-                return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+                return render_template("invalid.html", response=e, auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
         else:
-            return render_template('analysis_response.html', response="Upload a valid file",
+            return render_template('invalid.html', response="Upload a valid file",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
                                    version=version.__version__)
@@ -362,7 +356,7 @@ if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
 
     # STS credentials expire after 1 hour, so refresh every 50 minutes
-    schedule.every(15).minutes.do(re_init)
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    # schedule.every(15).minutes.do(re_init)
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(60)
