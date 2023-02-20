@@ -138,15 +138,17 @@ def upload():
         mp.track(get_username(), 'Users in Upload page')
         with start_transaction(op="task", name="Upload Page"):
 
-            upload_count = get_upload_count(get_username()) - 1
+            upload_count = get_upload_count(get_username())
 
             if upload_count == 0:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=0,
+                                       response=None,
                                        version=version.__version__)
             else:
                 return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=upload_count,
+                                       response=None,
                                        version=version.__version__)
     except Exception as e:
         print(e)
@@ -275,19 +277,19 @@ def askgpt_upload():
     """
     try:
         username = get_username()
-        upload_count = get_upload_count(username) - 1
+        upload_count = get_upload_count(username)
         try:
             openai.api_key = _vars['OPENAI_API_KEY']
         except KeyError:
 
-            return render_template("analysis_response.html", response="API key not set.",
+            return render_template("upload.html", response="API key not set.",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
                                    version=version.__version__)
 
         if request.files:
             if request.files['file'].filename == '':
-                return render_template('analysis_response.html', response="Please upload a valid file.",
+                return render_template('upload.html', response="Please upload a valid file.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
@@ -299,7 +301,7 @@ def askgpt_upload():
                     contents = pd.read_json(file)
             except Exception as e:
                 capture_exception(e)
-                return render_template('invalid.html', response="Cannot read file data. Please make sure "
+                return render_template('upload.html', response="Cannot read file data. Please make sure "
                                                                           "the file is not empty and is in one of "
                                                                           "the"
                                                                           " supported formats.",
@@ -308,22 +310,23 @@ def askgpt_upload():
                                        version=version.__version__)
 
             if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('invalid.html', response="File size too large.",
+                return render_template('upload.html', response="File size too large.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
             try:
                 results = fetch_performance_results(contents, file.filename, username)
-                return render_template("analysis_response.html", response=results,
+                upload_count += 1
+                return render_template("upload.html", response=results,
                                         auth=check_authorized_status(),
                                         upload_count=upload_count,
                                         version=version.__version__)
             except Exception as e:
-                return render_template("invalid.html", response=e, auth=check_authorized_status(),
+                return render_template("upload.html", response=e, auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
         else:
-            return render_template('invalid.html', response="Upload a valid file",
+            return render_template('upload.html', response="Upload a valid file",
                                    auth=check_authorized_status(),
                                    upload_count=upload_count,
                                    version=version.__version__)

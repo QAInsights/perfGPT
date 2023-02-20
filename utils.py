@@ -190,7 +190,7 @@ def get_upload_count(username):
         response = table.query(KeyConditionExpression=Key('username').eq(username))
         if response:
             total_count = response['Count']
-        return int(total_count)
+        return (int(total_count)-1)//2
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -395,3 +395,6 @@ def get_analytics_data():
     except ClientError as e:
         print_exceptions(e)
         capture_exception(e)
+
+if __name__ == "__main__":
+    pass
