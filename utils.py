@@ -75,14 +75,14 @@ def load_env_vars(application):
                                                         credentials)
 
     else:
-        print("No environment exists.")
+        logging.error("No environment exists.")
         exit(1)
     sts_credentials = STSCredentials(os.environ['ARN'])
     return _vars
 
 
 def print_exceptions(e):
-    print("Exception occurred on line:", traceback.format_exc().split("\n"))
+    logging.error("Exception occurred on line:", traceback.format_exc().split("\n"))
 
 
 def init_dynamodb():
@@ -106,7 +106,7 @@ def init_dynamodb():
     except Exception as e:
         print_exceptions(e)
         capture_exception(e)
-        print(e)
+        logging.error(e)
 
 
 def log_settings_db(username, slack_webhook=None, send_notifications=None, dynamodb=None):
@@ -135,14 +135,11 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
             return db_status
 
     except ClientError as e:
+        print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
+            logging.error("The security token has expired. Please refresh your token.")
             # re_init()
-            capture_exception(e)
-            print_exceptions(e)
-
-        else:
-            print(f"An error occurred: {e}")
+        capture_exception(e)
 
 
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
@@ -177,11 +174,8 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def get_upload_count(username):
@@ -200,11 +194,8 @@ def get_upload_count(username):
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def check_authorized_status():
@@ -282,11 +273,8 @@ def get_webhook():
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-            capture_exception(e)
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def save_webhook_url(integration_type=None, webhook_url=None):
@@ -314,11 +302,8 @@ def get_total_users_count():
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-            capture_exception(e)
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def get_upload_counts_all():
@@ -337,11 +322,8 @@ def get_upload_counts_all():
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-            capture_exception(e)
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def get_total_tokens_all():
@@ -365,10 +347,10 @@ def get_total_tokens_all():
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
+            logging.error("The security token has expired. Please refresh your token.")
             capture_exception(e)
         else:
-            print(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
             capture_exception(e)
 
 
@@ -388,11 +370,8 @@ def get_slack_notification_status():
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
-            capture_exception(e)
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+            logging.error("The security token has expired. Please refresh your token.")
+        capture_exception(e)
 
 
 def get_analytics_data():
@@ -410,13 +389,9 @@ def get_analytics_data():
                                                                    constants.AWS_DEFAULT_REGION,
                                                                    credentials)).text
         else:
-            print("No environment exits")
+            logging.error("No environment exits")
 
         return json.loads(get_analytics)
     except ClientError as e:
         print_exceptions(e)
         capture_exception(e)
-
-
-if __name__ == '__main__':
-    print("Test")

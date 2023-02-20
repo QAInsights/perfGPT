@@ -213,13 +213,12 @@ def account():
                                auth=check_authorized_status(), version=version.__version__)
 
 
-@application.route('/analyze', methods=['POST'])
-@application.route('/debug-sentry')
-@login_required
-def askgpt_upload():
-    """
-    ask GPT
-    :return:    analyzed response from GPT
+def fetch_performance_results(contents, filename, username):
+    """Fetch the performance results from OpenAI
+    :param contents: contents of uploaded file
+    :param file: uploaded filename
+    :param username: logged in username
+    :return: response from OpenAI
     """
     # Below prompts dict has the results title and the prompt for GPT to process
     prompts = {
@@ -228,10 +227,55 @@ def askgpt_upload():
         "Detailed Summary": "Act like a performance engineer and write a detailed summary from this raw performance "
                             "results."
     }
+
+    results = {}
+    for title, prompt in prompts.items():
+        response = openai.Completion.create(
+            model=constants.model,
+            prompt=f"""
+            {prompt}: \n {contents}
+            """,
+            temperature=constants.temperature,
+            max_tokens=constants.max_tokens,
+            top_p=constants.top_p,
+            frequency_penalty=constants.frequency_penalty,
+            presence_penalty=constants.presence_penalty
+        )
+        log_db(username=username, openai_id=response['id'],
+                openai_prompt_tokens=response['usage']['prompt_tokens'],
+                openai_completion_tokens=response['usage']['completion_tokens'],
+                openai_total_tokens=response['usage']['total_tokens'],
+                openai_created=response['created'])
+
+        # Send Slack Notifications if enabled
+        if get_slack_notification_status() == 'true':
+            try:
+                slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                                                filename=filename,
+                                                title=title,
+                                                webhook=get_webhook())
+            except Exception as e:
+                capture_exception(e)
+                pass
+
+        response = beautify_response(response['choices'][0]['text'])
+
+        results[title] = response
+
+    return results
+
+
+@application.route('/analyze', methods=['POST'])
+@application.route('/debug-sentry')
+@login_required
+def askgpt_upload():
+    """
+    ask GPT
+    :return:    analyzed response from GPT
+    """
     try:
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        upload_count = get_upload_count(check_authorized_status()['username']) - 1
+        username = get_username()
+        upload_count = get_upload_count(username) - 1
         try:
             openai.api_key = _vars['OPENAI_API_KEY']
         except KeyError:
@@ -269,41 +313,8 @@ def askgpt_upload():
                                        upload_count=upload_count,
                                        version=version.__version__)
             try:
-                responses = {}
-                for title, prompt in prompts.items():
-                    response = openai.Completion.create(
-                        model=constants.model,
-                        prompt=f"""
-                        {prompt}: \n {contents}
-                        """,
-                        temperature=constants.temperature,
-                        max_tokens=constants.max_tokens,
-                        top_p=constants.top_p,
-                        frequency_penalty=constants.frequency_penalty,
-                        presence_penalty=constants.presence_penalty
-                    )
-                    log_db(username=username, openai_id=response['id'],
-                           openai_prompt_tokens=response['usage']['prompt_tokens'],
-                           openai_completion_tokens=response['usage']['completion_tokens'],
-                           openai_total_tokens=response['usage']['total_tokens'],
-                           openai_created=response['created'])
-
-                    # Send Slack Notifications if enabled
-                    if get_slack_notification_status() == 'true':
-                        try:
-                            slack.send_slack_notifications(msg=response['choices'][0]['text'],
-                                                           filename=file.filename,
-                                                           title=title,
-                                                           webhook=get_webhook())
-                        except Exception as e:
-                            capture_exception(e)
-                            pass
-
-                    response = beautify_response(response['choices'][0]['text'])
-
-                    responses[title] = response
-
-                return render_template("analysis_response.html", response=responses,
+                results = fetch_performance_results(contents, file.filename, username)
+                return render_template("analysis_response.html", response=results,
                                         auth=check_authorized_status(),
                                         upload_count=upload_count,
                                         version=version.__version__)
@@ -354,9 +365,3 @@ def save_slack_notifications():
 
 if __name__ == '__main__':
     application.run(host='0.0.0.0', port=80, debug=True)
-
-    # STS credentials expire after 1 hour, so refresh every 50 minutes
-    # schedule.every(15).minutes.do(re_init)
-    # while True:
-    #     schedule.run_pending()
-    #     time.sleep(60)
