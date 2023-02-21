@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import boto3
 import requests
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from flask_dance.contrib.github import github
@@ -40,7 +40,6 @@ def load_env_vars(application):
     credentials = sts_credentials.get_credentials()
 
     dynamodb = init_dynamodb()
-
 
     if os.getenv('FLASK_ENV') == "development":
         application.secret_key = os.environ['FLASK_SECRET_KEY']
@@ -86,7 +85,6 @@ def print_exceptions(e):
 
 
 def init_dynamodb():
-
     global dynamodb, sts_credentials, table, settings_table
     try:
 
@@ -109,10 +107,9 @@ def init_dynamodb():
         print(e)
 
 
-def log_settings_db(username, slack_webhook=None, send_notifications=None, dynamodb=None):
+def update_slack_db(username, slack_webhook=None, send_notifications=None):
     """
 
-    :param dynamodb:
     :param send_notifications:
     :param username:
     :param slack_webhook:
@@ -120,14 +117,20 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
     """
     try:
         init_dynamodb()
-        db_response = settings_table.put_item(
-            Item={
-                "username": username,
-                "slack_webhook": slack_webhook,
-                "send_notifications": send_notifications
-            }
-        )
         db_status = "fail"
+        key = {'username': username}
+
+        new_attributes = {'slack_webhook': slack_webhook, 'send_notifications': send_notifications}
+
+        db_response = settings_table.update_item(
+            Key=key,
+            UpdateExpression='SET #a = :val1, #b = :val2',
+            ExpressionAttributeNames={'#a': 'slack_webhook', '#b': 'send_notifications'},
+            ExpressionAttributeValues={':val1': new_attributes['slack_webhook'],
+                                       ':val2': new_attributes['send_notifications']}
+        )
+
+
         if (db_response['ResponseMetadata']['HTTPStatusCode']) == 200:
             db_status = "success"
             return db_status
@@ -137,7 +140,6 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
     except ClientError as e:
         if e.response['Error']['Code'] == 'ExpiredTokenException':
             print("The security token has expired. Please refresh your token.")
-            # re_init()
             capture_exception(e)
             print_exceptions(e)
 
@@ -145,12 +147,93 @@ def log_settings_db(username, slack_webhook=None, send_notifications=None, dynam
             print(f"An error occurred: {e}")
 
 
-def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
-           openai_created=None, slack_webhook=None, dynamodb=None):
+def update_upload_count(username, upload_count=None):
+    """
+    Updates the upload count to the settings
+    :param upload_count:
+    :param username:    username
+    :return:
+    """
+    try:
+        init_dynamodb()
+        current_upload_count = upload_count - 1
+        key = {'username': username}
+
+        db_response = settings_table.update_item(
+            Key=key,
+            UpdateExpression='SET initial_upload_quota = :val1',
+            ExpressionAttributeValues={
+                ':val1': current_upload_count
+            }
+        )
+        return current_upload_count
+    except ClientError as e:
+        print_exceptions(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+
+        else:
+            print(f"An error occurred: {e}")
+            capture_exception(e)
+
+
+def check_user_in_db(username):
     """
 
-    :param dynamodb:
-    :param slack_webhook:
+    :param username:    username
+    :return:            True if new user signs up in the db, else False
+    """
+    try:
+        init_dynamodb()
+        db_response = settings_table.get_item(
+            Key={
+                "username": username
+            }
+        )
+        if 'Item' in db_response and 'username' in db_response['Item']:
+            return False
+        else:
+            return True
+
+    except ClientError as e:
+        print_exceptions(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+
+        else:
+            print(f"An error occurred: {e}")
+            capture_exception(e)
+
+
+def log_settings_db(username, initial_upload_quota=None):
+    """
+
+    :param initial_upload_quota:
+    :param username:
+    :return:
+    """
+    try:
+        init_dynamodb()
+        db_response = settings_table.put_item(
+            Item={
+                "username": username,
+                "initial_upload_quota": initial_upload_quota
+            }
+        )
+    except ClientError as e:
+        print_exceptions(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+
+        else:
+            print(f"An error occurred: {e}")
+            capture_exception(e)
+
+
+def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
+           openai_created=None):
+    """
+
     :param username:
     :param openai_id:
     :param openai_prompt_tokens:
@@ -164,16 +247,36 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
         db_response = table.put_item(
             Item={
                 "username": username,
-                "inital_upload_limit": 10,
                 "datetime": str(openai_created),
                 "open_id": openai_id,
                 "openai_prompt_tokens": openai_prompt_tokens,
                 "openai_completion_tokens": openai_completion_tokens,
                 "openai_total_tokens": openai_total_tokens,
-                "slack_webhook": slack_webhook,
-                "premium_user": False
             }
         )
+    except ClientError as e:
+        print_exceptions(e)
+        if e.response['Error']['Code'] == 'ExpiredTokenException':
+            print("The security token has expired. Please refresh your token.")
+
+        else:
+            print(f"An error occurred: {e}")
+            capture_exception(e)
+
+
+def insert_initial_upload_quota_db(username):
+    try:
+        init_dynamodb()
+
+        db_response = settings_table.put_item(
+            Item={
+                "username": username,
+                "initial_upload_quota": constants.upload_quota
+            }
+        )
+        print(db_response)
+        return db_response['Items'][0]['initial_upload_quota']
+
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -193,9 +296,13 @@ def get_upload_count(username):
     try:
         init_dynamodb()
         total_count = 0
-        response = table.query(KeyConditionExpression=Key('username').eq(username))
-        if response:
-            total_count = response['Count']
+        response = settings_table.query(KeyConditionExpression=Key('username').eq(username))
+        if response['Items']:
+            if 'initial_upload_quota' in response['Items'][0]:
+                total_count = response['Items'][0]['initial_upload_quota']
+                return int(total_count)
+            else:
+                return total_count
         return int(total_count)
     except ClientError as e:
         print_exceptions(e)
@@ -274,11 +381,12 @@ def get_webhook():
     try:
         init_dynamodb()
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
-
         if response['Items']:
-            if response['Items'][0]['slack_webhook']:
+            if 'slack_webhook' in response['Items'][0]:
                 return response['Items'][0]['slack_webhook']
-        return None
+            else:
+                return None
+
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -296,7 +404,7 @@ def save_webhook_url(integration_type=None, webhook_url=None):
     :param webhook_url:
     :return:
     """
-    return log_settings_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
+    return update_slack_db(username=get_username(), slack_webhook=webhook_url, send_notifications="no")
 
 
 def get_total_users_count():
@@ -381,7 +489,7 @@ def get_slack_notification_status():
         init_dynamodb()
         response = settings_table.query(KeyConditionExpression=Key('username').eq(get_username()))
         if response['Items']:
-            if response['Items'][0]['send_notifications']:
+            if 'send_notifications' in response['Items'][0]:
                 return response['Items'][0]['send_notifications']
             else:
                 return None
