@@ -297,8 +297,10 @@ def askgpt_upload():
             try:
                 if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
                     contents = pd.read_csv(file)
-                if file.filename.endswith('.json'):
+                elif file.filename.endswith('.json'):
                     contents = pd.read_json(file)
+                else:
+                    raise Exception('Invalid file type.')
             except Exception as e:
                 capture_exception(e)
                 return render_template('upload.html', response="Cannot read file data. Please make sure "
