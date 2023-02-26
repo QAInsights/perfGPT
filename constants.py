@@ -8,4 +8,5 @@ top_p = 1.0
 frequency_penalty = 0.0
 presence_penalty = 0.0
 dynamodb_table = "perfgpt_dev"
+upload_quota = 10
 
