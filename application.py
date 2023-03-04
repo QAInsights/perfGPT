@@ -335,7 +335,7 @@ def askgpt_upload():
                                        upload_count=upload_count,
                                        version=version.__version__)
         else:
-            render_template('upload.html', response="You do not have enough credits. Please wait for the "
+            return render_template('upload.html', response="You do not have enough credits. Please wait for the "
                                                                "next month credit or upgrade now.",
                             auth=check_authorized_status(),
                             upload_count=upload_count,
