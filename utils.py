@@ -130,12 +130,10 @@ def update_slack_db(username, slack_webhook=None, send_notifications=None):
                                        ':val2': new_attributes['send_notifications']}
         )
 
-
         if (db_response['ResponseMetadata']['HTTPStatusCode']) == 200:
             db_status = "success"
             return db_status
-        else:
-            return db_status
+        return db_status
 
     except ClientError as e:
         print_exceptions(e)
@@ -145,7 +143,7 @@ def update_slack_db(username, slack_webhook=None, send_notifications=None):
         capture_exception(e)
 
 
-def update_upload_count(username, upload_count=None):
+def update_upload_count(username, upload_count):
     """
     Updates the upload count to the settings
     :param upload_count:
@@ -154,17 +152,16 @@ def update_upload_count(username, upload_count=None):
     """
     try:
         init_dynamodb()
-        current_upload_count = upload_count - 1
         key = {'username': username}
 
         db_response = settings_table.update_item(
             Key=key,
             UpdateExpression='SET initial_upload_quota = :val1',
             ExpressionAttributeValues={
-                ':val1': current_upload_count
+                ':val1': upload_count
             }
         )
-        return current_upload_count
+        return upload_count
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -190,8 +187,7 @@ def check_user_in_db(username):
         )
         if 'Item' in db_response and 'username' in db_response['Item']:
             return False
-        else:
-            return True
+        return True
 
     except ClientError as e:
         print_exceptions(e)
@@ -203,29 +199,29 @@ def check_user_in_db(username):
             capture_exception(e)
 
 
-def log_settings_db(username, initial_upload_quota=None):
-    """
+# def log_settings_db(username, initial_upload_quota=None):
+#     """
 
-    :param initial_upload_quota:
-    :param username:
-    :return:
-    """
-    try:
-        init_dynamodb()
-        db_response = settings_table.put_item(
-            Item={
-                "username": username,
-                "initial_upload_quota": initial_upload_quota
-            }
-        )
-    except ClientError as e:
-        print_exceptions(e)
-        if e.response['Error']['Code'] == 'ExpiredTokenException':
-            print("The security token has expired. Please refresh your token.")
+#     :param initial_upload_quota:
+#     :param username:
+#     :return:
+#     """
+#     try:
+#         init_dynamodb()
+#         db_response = settings_table.put_item(
+#             Item={
+#                 "username": username,
+#                 "initial_upload_quota": initial_upload_quota
+#             }
+#         )
+#     except ClientError as e:
+#         print_exceptions(e)
+#         if e.response['Error']['Code'] == 'ExpiredTokenException':
+#             print("The security token has expired. Please refresh your token.")
 
-        else:
-            print(f"An error occurred: {e}")
-            capture_exception(e)
+#         else:
+#             print(f"An error occurred: {e}")
+#             capture_exception(e)
 
 
 def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completion_tokens=None, openai_total_tokens=None,
@@ -269,7 +265,6 @@ def insert_initial_upload_quota_db(username):
                 "initial_upload_quota": constants.upload_quota
             }
         )
-        print(db_response)
         return db_response['Items'][0]['initial_upload_quota']
 
     except ClientError as e:
@@ -291,13 +286,13 @@ def get_upload_count(username):
     try:
         init_dynamodb()
         total_count = 0
-        response = settings_table.query(KeyConditionExpression=Key('username').eq(username))
-        if response['Items']:
-            if 'initial_upload_quota' in response['Items'][0]:
-                total_count = response['Items'][0]['initial_upload_quota']
-                return int(total_count)
-            else:
-                return total_count
+        key = {'username': username}
+        # response = settings_table.query(KeyConditionExpression=Key('username').eq(username))
+        response = settings_table.get_item(Key=key)
+
+        if 'initial_upload_quota' in response['Item']:
+            total_count = response['Item']['initial_upload_quota']
+            return int(total_count)
         return int(total_count)
     except ClientError as e:
         print_exceptions(e)

@@ -135,22 +135,15 @@ def github_sign():
 
 
 @application.route('/upload')
-@application.route('/debug-sentry')
+# @application.route('/debug-sentry')
 @login_required
 def upload():
     try:
         mp.track(get_username(), 'Users in Upload page')
         with start_transaction(op="task", name="Upload Page"):
-            upload_count = get_upload_count(get_username()) - 1
-            webhook = get_webhook()
+            upload_count = get_upload_count(get_username())
 
-            if upload_count == 0:
-                return render_template('upload.html', auth=check_authorized_status(),
-                                       upload_count=0,
-                                       response=None,
-                                       version=version.__version__)
-            else:
-                return render_template('upload.html', auth=check_authorized_status(),
+            return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        response=None,
                                        version=version.__version__)
@@ -271,7 +264,7 @@ def fetch_performance_results(contents, filename, username):
 
 
 @application.route('/analyze', methods=['POST'])
-@application.route('/debug-sentry')
+# @application.route('/debug-sentry')
 @login_required
 def askgpt_upload():
     """
@@ -279,16 +272,14 @@ def askgpt_upload():
     :return:    analyzed response from GPT
     """
     try:
-        resp = github.get("/user")
-        username = resp.json()["login"]
+        username = get_username()
         upload_count = get_upload_count(username)
 
         if 1 <= upload_count <= constants.upload_quota:
-            print("Inside if")
             try:
                 openai.api_key = _vars['OPENAI_API_KEY']
             except KeyError:
-                return render_template("analysis_response.html", response="API key not set. Please contact the "
+                return render_template("upload.html", response="API key not set. Please contact the "
                                                                           "administrator.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
@@ -296,7 +287,7 @@ def askgpt_upload():
 
             if request.files:
                 if request.files['file'].filename == '':
-                    return render_template('analysis_response.html', response="Please upload a valid file.",
+                    return render_template('upload.html', response="Please upload a valid file.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
@@ -304,11 +295,14 @@ def askgpt_upload():
                 try:
                     if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
                         contents = pd.read_csv(file)
-                    if file.filename.endswith('.json'):
+                    elif file.filename.endswith('.json'):
                         contents = pd.read_json(file)
+                    else:
+                        raise Exception('Invalid file type.')
                 except Exception as e:
                     capture_exception(e)
-                    return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
+
+                    return render_template('upload.html', response="Cannot read file data. Please make sure "
                                                                               "the file is not empty and is in one of "
                                                                               "the"
                                                                               " supported formats.",
@@ -317,30 +311,31 @@ def askgpt_upload():
                                            version=version.__version__)
 
                 if contents.memory_usage().sum() > constants.FILE_SIZE:
-                    return render_template('analysis_response.html', response="File size too large.",
+                    return render_template('upload.html', response="File size too large.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
                 try:
                     results = fetch_performance_results(contents, file.filename, username)
-                    upload_count = update_upload_count(username, upload_count=upload_count)
+                    upload_count -= 1
+                    update_upload_count(username, upload_count)
 
-                    return render_template("analysis_response.html", response=results,
+                    return render_template("upload.html", response=results,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
                 except Exception as e:
-                    return render_template("analysis_response.html", response=e,
+                    return render_template("upload.html", response=e,
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
             else:
-                return render_template('analysis_response.html', response="Upload a valid file",
+                return render_template('upload.html', response="Upload a valid file",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
         else:
-            render_template('analysis_response.html', response="You do not have enough credits. Please wait for the "
+            render_template('upload.html', response="You do not have enough credits. Please wait for the "
                                                                "next month credit or upgrade now.",
                             auth=check_authorized_status(),
                             upload_count=upload_count,
