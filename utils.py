@@ -248,6 +248,7 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
                 "openai_total_tokens": openai_total_tokens,
             }
         )
+        print("Inside logDB: ", str(db_response))
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -265,7 +266,6 @@ def insert_initial_upload_quota_db(username):
                 "initial_upload_quota": constants.upload_quota
             }
         )
-        return db_response['Items'][0]['initial_upload_quota']
 
     except ClientError as e:
         print_exceptions(e)
