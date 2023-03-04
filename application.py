@@ -7,7 +7,6 @@ from flask_dance.contrib.github import make_github_blueprint
 from integrations.slack import slack
 import version
 from utils import *
-from analytics import *
 from mixpanel import Mixpanel
 from sentry_sdk import capture_exception
 import sentry_sdk
