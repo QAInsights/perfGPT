@@ -15,7 +15,7 @@
     <p class="lead">OpenAI will analyze the results and present its findings.</p>
     <hr/>
     <div class="alert alert-info" role="alert">
-          You have <b>{{ 10 - (upload_count / 2)|int }}/10</b> uploads remaining for this month.
+          You have <b>{{ upload_count }}/10</b> uploads remaining for this month.
     </div>
     <h4>⬆️ Upload test results:</h4>
     <div class="mb-3">
@@ -26,7 +26,7 @@
                         <input class="form-control form-control-m" type="file" name="file" accept=".csv,.json,.jtl">
                     </div>
                     <div class="col">
-                        {% if (upload_count/2)|int >= 10 %}
+                        {% if upload_count <= 0 %}
                         <input disabled class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
                         {% else %}
                         <input class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
@@ -62,7 +62,30 @@
     <span class="mb-3"></span>
 </div>
 
-{% endblock %}
-{% block body %}
+{% if response is not none %}
+    {% if response is mapping %}
+        {% for key, value in response.items() %}
+            <div class="card bg-primary">
+                <div class="card-header">
+                    <h3 class="card-title" style="color: white">📊 {{ key }}</h3>
+                </div>
+                <div class="card-body bg-light">
+                    {{ value|safe }}
+                </div>
+            </div>
+            <br/>
+        {% endfor %}
+    {% else %}
+        <div class="card bg-primary">
+            <div class="card-header">
+                <h3 class="card-title" style="color: white">📊 Response </h3>
+            </div>
+            <div class="card-body bg-light">
+                {{ response|safe }}
+            </div>
+        </div>
+        <br/>
+    {% endif %}
+{% endif %}
 
 {% endblock %}

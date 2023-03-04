@@ -1,7 +1,6 @@
-from urllib import response
 import openai
 import pandas as pd
-from flask import Flask, request, render_template, jsonify, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
 
@@ -9,8 +8,6 @@ from integrations.slack import slack
 import version
 from utils import *
 from analytics import *
-import schedule
-import time
 from mixpanel import Mixpanel
 from sentry_sdk import capture_exception
 import sentry_sdk
@@ -88,6 +85,7 @@ def index():
         if github.authorized:
             username = get_username()
             log_db(username=username)
+
         with start_transaction(op="task", name="Home Page"):
             get_analytics_response = get_analytics_data()
             return render_template("index.html", image=hero_image,
@@ -128,31 +126,26 @@ def page_not_found(error):
 def github_sign():
     username = get_username()
     log_db(username=username)
-    mp.track(username, 'User signed up')
 
+    if check_user_in_db(username=username):
+        insert_initial_upload_quota_db(username)
+
+    mp.track(username, 'User signed up')
     return redirect('/')
 
 
 @application.route('/upload')
-@application.route('/debug-sentry')
+# @application.route('/debug-sentry')
 @login_required
 def upload():
     try:
         mp.track(get_username(), 'Users in Upload page')
         with start_transaction(op="task", name="Upload Page"):
+            upload_count = get_upload_count(get_username())
 
-            upload_count = get_upload_count(get_username()) - 1
-            webhook = get_webhook()
-
-            if upload_count == 0:
-                return render_template('upload.html', auth=check_authorized_status(),
-                                       upload_count=0,
-                                       webhook=webhook,
-                                       version=version.__version__)
-            else:
-                return render_template('upload.html', auth=check_authorized_status(),
+            return render_template('upload.html', auth=check_authorized_status(),
                                        upload_count=upload_count,
-                                       webhook=webhook,
+                                       response=None,
                                        version=version.__version__)
     except Exception as e:
         print(e)
@@ -168,7 +161,6 @@ def about():
 
     :return: about page
     """
-    # logger.info({"message_type": "user_signin", "username": "test"})
     return render_template("about.html", auth=check_authorized_status(), version=version.__version__)
 
 
@@ -219,13 +211,12 @@ def account():
                                auth=check_authorized_status(), version=version.__version__)
 
 
-@application.route('/analyze', methods=['POST'])
-@application.route('/debug-sentry')
-@login_required
-def askgpt_upload():
-    """
-    ask GPT
-    :return:    analyzed response from GPT
+def fetch_performance_results(contents, filename, username):
+    """Fetch the performance results from OpenAI
+    :param contents: contents of uploaded file
+    :param file: uploaded filename
+    :param username: logged in username
+    :return: response from OpenAI
     """
     # Below prompts dict has the results title and the prompt for GPT to process
     prompts = {
@@ -234,99 +225,128 @@ def askgpt_upload():
         "Detailed Summary": "Act like a performance engineer and write a detailed summary from this raw performance "
                             "results."
     }
-    try:
-        resp = github.get("/user")
-        username = resp.json()["login"]
-        upload_count = get_upload_count(check_authorized_status()['username']) - 1
-        try:
-            openai.api_key = _vars['OPENAI_API_KEY']
-        except KeyError:
 
-            return render_template("analysis_response.html", response="API key not set.",
-                                   auth=check_authorized_status(),
-                                   upload_count=upload_count,
-                                   version=version.__version__)
+    results = {}
+    for title, prompt in prompts.items():
+        response = openai.Completion.create(
+            model=constants.model,
+            prompt=f"""
+            {prompt}: \n {contents}
+            """,
+            temperature=constants.temperature,
+            max_tokens=constants.max_tokens,
+            top_p=constants.top_p,
+            frequency_penalty=constants.frequency_penalty,
+            presence_penalty=constants.presence_penalty
+        )
+        log_db(username=username, openai_id=response['id'],
+                openai_prompt_tokens=response['usage']['prompt_tokens'],
+                openai_completion_tokens=response['usage']['completion_tokens'],
+                openai_total_tokens=response['usage']['total_tokens'],
+                openai_created=response['created'])
 
-        if request.files:
-            if request.files['file'].filename == '':
-                return render_template('analysis_response.html', response="Please upload a valid file.",
-                                       auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       version=version.__version__)
-            file = request.files['file']
+        # Send Slack Notifications if enabled
+        if get_slack_notification_status() == 'true':
             try:
-                if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
-                    contents = pd.read_csv(file)
-                if file.filename.endswith('.json'):
-                    contents = pd.read_json(file)
+                slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                                                filename=filename,
+                                                title=title,
+                                                webhook=get_webhook())
             except Exception as e:
                 capture_exception(e)
-                return render_template('analysis_response.html', response="Cannot read file data. Please make sure "
-                                                                          "the file is not empty and is in one of "
-                                                                          "the"
-                                                                          " supported formats.",
-                                       auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       version=version.__version__)
+                pass
 
-            if contents.memory_usage().sum() > constants.FILE_SIZE:
-                return render_template('analysis_response.html', response="File size too large.",
-                                       auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       version=version.__version__)
+        response = beautify_response(response['choices'][0]['text'])
+
+        results[title] = response
+
+    return results
+
+
+@application.route('/analyze', methods=['POST'])
+# @application.route('/debug-sentry')
+@login_required
+def askgpt_upload():
+    """
+    ask GPT
+    :return:    analyzed response from GPT
+    """
+    try:
+        username = get_username()
+        upload_count = get_upload_count(username)
+
+        if 1 <= upload_count <= constants.upload_quota:
             try:
-                responses = {}
-                for title, prompt in prompts.items():
-                    response = openai.Completion.create(
-                        model=constants.model,
-                        prompt=f"""
-                        {prompt}: \n {contents}
-                        """,
-                        temperature=constants.temperature,
-                        max_tokens=constants.max_tokens,
-                        top_p=constants.top_p,
-                        frequency_penalty=constants.frequency_penalty,
-                        presence_penalty=constants.presence_penalty
-                    )
-                    log_db(username=username, openai_id=response['id'],
-                           openai_prompt_tokens=response['usage']['prompt_tokens'],
-                           openai_completion_tokens=response['usage']['completion_tokens'],
-                           openai_total_tokens=response['usage']['total_tokens'],
-                           openai_created=response['created'])
-
-                    # Send Slack Notifications if enabled
-                    if get_slack_notification_status() == 'true':
-                        try:
-                            slack.send_slack_notifications(msg=response['choices'][0]['text'],
-                                                           filename=file.filename,
-                                                           title=title,
-                                                           webhook=get_webhook())
-                        except Exception as e:
-                            capture_exception(e)
-                            pass
-
-                    response = beautify_response(response['choices'][0]['text'])
-
-                    responses[title] = response
-
-                return render_template("analysis_response.html", response=responses,
+                openai.api_key = _vars['OPENAI_API_KEY']
+            except KeyError:
+                return render_template("upload.html", response="API key not set. Please contact the "
+                                                                          "administrator.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
-            except Exception as e:
-                return render_template("analysis_response.html", response=e, auth=check_authorized_status(),
+
+            if request.files:
+                if request.files['file'].filename == '':
+                    return render_template('upload.html', response="Please upload a valid file.",
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=version.__version__)
+                file = request.files['file']
+                try:
+                    if file.filename.endswith('.csv') or file.filename.endswith('.jtl'):
+                        contents = pd.read_csv(file)
+                    elif file.filename.endswith('.json'):
+                        contents = pd.read_json(file)
+                    else:
+                        raise Exception('Invalid file type.')
+                except Exception as e:
+                    capture_exception(e)
+
+                    return render_template('upload.html', response="Cannot read file data. Please make sure "
+                                                                              "the file is not empty and is in one of "
+                                                                              "the"
+                                                                              " supported formats.",
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=version.__version__)
+
+                if contents.memory_usage().sum() > constants.FILE_SIZE:
+                    return render_template('upload.html', response="File size too large.",
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=version.__version__)
+                try:
+                    results = fetch_performance_results(contents, file.filename, username)
+                    upload_count -= 1
+                    update_upload_count(username, upload_count)
+
+                    return render_template("upload.html", response=results,
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=version.__version__)
+                except Exception as e:
+                    return render_template("upload.html", response=e,
+                                           auth=check_authorized_status(),
+                                           upload_count=upload_count,
+                                           version=version.__version__)
+            else:
+                return render_template('upload.html', response="Upload a valid file",
+                                       auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
         else:
-            return render_template('analysis_response.html', response="Upload a valid file",
-                                   auth=check_authorized_status(),
-                                   upload_count=upload_count,
-                                   version=version.__version__)
+            return render_template('upload.html', response="You do not have enough credits. Please wait for the "
+                                                               "next month credit or upgrade now.",
+                            auth=check_authorized_status(),
+                            upload_count=upload_count,
+                            version=version.__version__)
     except Exception as e:
         print(e)
         capture_exception(e)
-        return render_template("invalid.html", image=invalid_image, response=e,
-                               auth=check_authorized_status(), version=version.__version__)
+        return render_template("invalid.html", image=invalid_image,
+                               response=e,
+                               auth=check_authorized_status(),
+                               version=version.__version__)
 
 
 @application.route('/saveslack', methods=['POST'])
@@ -352,17 +372,11 @@ def save_slack_key():
 def save_slack_notifications():
     try:
         status = request.form['status']
-        log_settings_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
+        update_slack_db(username=get_username(), slack_webhook=get_webhook(), send_notifications=status)
         return "Done"
     except Exception as e:
         capture_exception(e)
 
 
 if __name__ == '__main__':
-    application.run(host='0.0.0.0', port=80, debug=True)
-
-    # STS credentials expire after 1 hour, so refresh every 50 minutes
-    schedule.every(15).minutes.do(re_init)
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    application.run(host='0.0.0.0', port=80)
