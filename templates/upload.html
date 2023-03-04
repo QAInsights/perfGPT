@@ -15,7 +15,7 @@
     <p class="lead">OpenAI will analyze the results and present its findings.</p>
     <hr/>
     <div class="alert alert-info" role="alert">
-          You have <b>{{ 10 - upload_count }}/10</b> uploads remaining for this month.
+          You have <b>{{ upload_count }}/10</b> uploads remaining for this month.
     </div>
     <h4>⬆️ Upload test results:</h4>
     <div class="mb-3">
@@ -26,7 +26,7 @@
                         <input class="form-control form-control-m" type="file" name="file" accept=".csv,.json,.jtl">
                     </div>
                     <div class="col">
-                        {% if upload_count >= 10 %}
+                        {% if upload_count <= 0 %}
                         <input disabled class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
                         {% else %}
                         <input class="btn btn-primary mb-3" type="submit" value="Upload" onclick="loading();">
