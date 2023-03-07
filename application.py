@@ -126,7 +126,7 @@ def github_sign():
     username = get_username()
     log_db(username=username)
 
-    if check_user_in_db(username=username):
+    if check_user_in_settings_db(username=username):
         insert_initial_upload_quota_db(username)
 
     mp.track(username, 'User signed up')
@@ -134,18 +134,20 @@ def github_sign():
 
 
 @application.route('/upload')
-# @application.route('/debug-sentry')
 @login_required
 def upload():
     try:
         mp.track(get_username(), 'Users in Upload page')
         with start_transaction(op="task", name="Upload Page"):
+            if check_user_in_settings_db(username=get_username()):
+                insert_initial_upload_quota_db(get_username())
+
             upload_count = get_upload_count(get_username())
 
             return render_template('upload.html', auth=check_authorized_status(),
-                                       upload_count=upload_count,
-                                       response=None,
-                                       version=version.__version__)
+                                   upload_count=upload_count,
+                                   response=None,
+                                   version=version.__version__)
     except Exception as e:
         print(e)
         capture_exception(e)
@@ -239,18 +241,18 @@ def fetch_performance_results(contents, filename, username):
             presence_penalty=constants.presence_penalty
         )
         log_db(username=username, openai_id=response['id'],
-                openai_prompt_tokens=response['usage']['prompt_tokens'],
-                openai_completion_tokens=response['usage']['completion_tokens'],
-                openai_total_tokens=response['usage']['total_tokens'],
-                openai_created=response['created'])
+               openai_prompt_tokens=response['usage']['prompt_tokens'],
+               openai_completion_tokens=response['usage']['completion_tokens'],
+               openai_total_tokens=response['usage']['total_tokens'],
+               openai_created=response['created'])
 
         # Send Slack Notifications if enabled
         if get_slack_notification_status() == 'true':
             try:
                 slack.send_slack_notifications(msg=response['choices'][0]['text'],
-                                                filename=filename,
-                                                title=title,
-                                                webhook=get_webhook())
+                                               filename=filename,
+                                               title=title,
+                                               webhook=get_webhook())
             except Exception as e:
                 capture_exception(e)
                 pass
@@ -279,7 +281,7 @@ def askgpt_upload():
                 openai.api_key = _vars['OPENAI_API_KEY']
             except KeyError:
                 return render_template("upload.html", response="API key not set. Please contact the "
-                                                                          "administrator.",
+                                                               "administrator.",
                                        auth=check_authorized_status(),
                                        upload_count=upload_count,
                                        version=version.__version__)
@@ -302,9 +304,9 @@ def askgpt_upload():
                     capture_exception(e)
 
                     return render_template('upload.html', response="Cannot read file data. Please make sure "
-                                                                              "the file is not empty and is in one of "
-                                                                              "the"
-                                                                              " supported formats.",
+                                                                   "the file is not empty and is in one of "
+                                                                   "the"
+                                                                   " supported formats.",
                                            auth=check_authorized_status(),
                                            upload_count=upload_count,
                                            version=version.__version__)
@@ -335,10 +337,10 @@ def askgpt_upload():
                                        version=version.__version__)
         else:
             return render_template('upload.html', response="You do not have enough credits. Please wait for the "
-                                                               "next month credit or upgrade now.",
-                            auth=check_authorized_status(),
-                            upload_count=upload_count,
-                            version=version.__version__)
+                                                           "next month credit or upgrade now.",
+                                   auth=check_authorized_status(),
+                                   upload_count=upload_count,
+                                   version=version.__version__)
     except Exception as e:
         print(e)
         capture_exception(e)

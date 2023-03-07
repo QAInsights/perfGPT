@@ -172,7 +172,7 @@ def update_upload_count(username, upload_count):
             capture_exception(e)
 
 
-def check_user_in_db(username):
+def check_user_in_settings_db(username):
     """
 
     :param username:    username
@@ -248,7 +248,6 @@ def log_db(username, openai_id=None, openai_prompt_tokens=None, openai_completio
                 "openai_total_tokens": openai_total_tokens,
             }
         )
-        print("Inside logDB: ", str(db_response))
     except ClientError as e:
         print_exceptions(e)
         if e.response['Error']['Code'] == 'ExpiredTokenException':
@@ -289,8 +288,7 @@ def get_upload_count(username):
         key = {'username': username}
         # response = settings_table.query(KeyConditionExpression=Key('username').eq(username))
         response = settings_table.get_item(Key=key)
-
-        if 'initial_upload_quota' in response['Item']:
+        if 'Item' in response and 'initial_upload_quota' in response['Item']:
             total_count = response['Item']['initial_upload_quota']
             return int(total_count)
         return int(total_count)
