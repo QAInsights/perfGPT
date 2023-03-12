@@ -26,6 +26,12 @@
             </ul>
             <ul class="navbar-nav">
                 <li class="nav-item me-3 mt-2">
+                    <button type="button" class="btn btn-primary switch">
+                      <i class="fas fa-cloud-moon moon-icon" style="display: none; font-size: 1rem !important;"></i>
+                      <i class="fas fa-cloud-sun sun-icon" style="display: block; font-size: 1rem !important;"></i>
+                    </button>
+                </li>
+                <li class="nav-item me-3 mt-2">
                     <a class="github-button" href="https://github.com/qainsights/perfGPT" data-size="large" data-show-count="true">Star</a>
                 </li>
                 {% if auth['username'] != None %}
@@ -40,3 +46,38 @@
         </div>
     </div>
 </nav>
+<script language="JavaScript">
+  // check if user has set a theme preference
+  const storedTheme = localStorage.getItem('theme')
+  if (storedTheme) {
+    // set theme preference if it exists
+    const html = document.querySelector('html')
+    html.setAttribute('data-bs-theme', storedTheme)
+    $('body').addClass(storedTheme)
+
+    if (storedTheme === 'dark') {
+      $('.moon-icon').css('display', 'block')
+      $('.sun-icon').css('display', 'none')
+      console.log("dark")
+    } else {
+      $('.moon-icon').css('display', 'none')
+      $('.sun-icon').css('display', 'block')
+      console.log("light")
+    }
+  }
+  // toggle between light and dark mode
+  $('.switch').click(() => {
+    const html = document.querySelector('html')
+    const currentTheme = html.getAttribute('data-bs-theme')
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light'
+    html.setAttribute('data-bs-theme', newTheme)
+    $('body').removeClass('light dark').addClass(newTheme)
+    // toggle button icon
+    $('.moon-icon').toggle()
+    $('.sun-icon').toggle()
+
+    // store theme preference in localStorage
+    localStorage.setItem('theme', newTheme)
+    console.log(newTheme)
+  })
+</script>
