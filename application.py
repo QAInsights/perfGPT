@@ -127,7 +127,7 @@ def github_sign():
     username = get_username()
     log_db(username=username)
 
-    if check_user_in_db(username=username):
+    if check_user_in_settings_db(username=username):
         insert_initial_upload_quota_db(username)
 
     mp.track(username, 'User signed up')
@@ -135,12 +135,14 @@ def github_sign():
 
 
 @application.route('/upload')
-# @application.route('/debug-sentry')
 @login_required
 def upload():
     try:
         mp.track(get_username(), 'Users in Upload page')
         with start_transaction(op="task", name="Upload Page"):
+            if check_user_in_settings_db(username=get_username()):
+                insert_initial_upload_quota_db(get_username())
+
             upload_count = get_upload_count(get_username())
 
             return render_template('upload.html', auth=check_authorized_status(),
