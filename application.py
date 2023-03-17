@@ -4,6 +4,7 @@ from flask import Flask, request, render_template, redirect, url_for
 from flask import send_from_directory
 from flask_dance.contrib.github import make_github_blueprint
 
+import constants
 from integrations.slack import slack
 import version
 from utils import *
@@ -222,24 +223,29 @@ def fetch_performance_results(contents, filename, username):
     # Below prompts dict has the results title and the prompt for GPT to process
     prompts = {
         "High level Summary": "Act like a performance engineer. Please analyse this performance test results and give "
-                              "me a high level summary.",
+                              "me a high level summary. Beautify the response in a HTML format.",
         "Detailed Summary": "Act like a performance engineer and write a detailed summary from this raw performance "
-                            "results."
+                            "results without a title. You need to identify the anomalies, standard deviations, "
+                            "minimum and maximum response"
+                            "time, number of errors, and number of transactions. Help me identifying potential "
+                            "bottlenecks as well. Beautify the response in a HTML list format."
     }
 
     results = {}
     for title, prompt in prompts.items():
-        response = openai.Completion.create(
-            model=constants.model,
-            prompt=f"""
-            {prompt}: \n {contents}
-            """,
+        response = openai.ChatCompletion.create(
+            model=constants.openai_model,
+            messages=[
+                {"role": "system", "content": f"{prompt}"},
+                {"role": "user", "content": f"{contents}"},
+            ],
             temperature=constants.temperature,
-            max_tokens=constants.max_tokens,
             top_p=constants.top_p,
+            max_tokens=constants.max_tokens,
+            presence_penalty=constants.presence_penalty,
             frequency_penalty=constants.frequency_penalty,
-            presence_penalty=constants.presence_penalty
         )
+
         log_db(username=username, openai_id=response['id'],
                openai_prompt_tokens=response['usage']['prompt_tokens'],
                openai_completion_tokens=response['usage']['completion_tokens'],
@@ -249,7 +255,7 @@ def fetch_performance_results(contents, filename, username):
         # Send Slack Notifications if enabled
         if get_slack_notification_status() == 'true':
             try:
-                slack.send_slack_notifications(msg=response['choices'][0]['text'],
+                slack.send_slack_notifications(msg=response['choices'][0]['message']['content'],
                                                filename=filename,
                                                title=title,
                                                webhook=get_webhook())
@@ -257,9 +263,9 @@ def fetch_performance_results(contents, filename, username):
                 capture_exception(e)
                 pass
 
-        response = beautify_response(response['choices'][0]['text'])
+        # response = beautify_response(response['choices'][0]['message']['content'])
 
-        results[title] = response
+        results[title] = response['choices'][0]['message']['content']
 
     return results
 
